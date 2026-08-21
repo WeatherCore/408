@@ -61,7 +61,21 @@ description: 考研408（数据结构、计算机组成原理、操作系统、�
 
 ### 3. 出题检验
 
-回答正文后自然接一道选择题（或简答题，视上下文而定）。
+回答正文后自然接一道选择题（或简答题，视上下文而定）。出题源优先级：**真题优先，无匹配则自出**。
+
+**出题源决策：**
+- 检索 `references/exam-archive/exam-index.json`（倒排索引：知识点→年份+题号）
+- 索引中有匹配当前知识点的真题 → 用真题（优先近 6 年，即 2020-2025）
+- 索引中无匹配 / 匹配质量差 → Skill 自出题（琐碎知识点、未考过的角度由 Skill 补位）
+
+**真题出题流程（Q10=A, Q11=A）：**
+1. LLM 读取 `references/exam-archive/exam-index.json`，在上下文中按知识点匹配真题
+2. 展示真题元信息（年份 + 题号 + 题型），让学生知道这是真题
+3. 用 `scripts/pdfcraft/pdfcraft.py to_images` 截取该题所在页面，展示原题截图（保留公式/图表原貌）
+4. 选择题四选项逐一解析（Skill 自写，见纠错四步法）
+5. 用户作答后，先给 Skill 自写的解析；再问"要看官方答案解析吗？"（Q12=B），用户确认后用 PDF-Craft 从答案 PDF 提取对应解析
+
+**自出题流程：**
 - 选择题：四个选项，用户作答后立即对每个选项给出解析
 - 简答题：给出参考要点，供用户自评
 
@@ -127,8 +141,12 @@ description: 考研408（数据结构、计算机组成原理、操作系统、�
 │   └─ 无跨科关联？→ 纯本学科讲解
 │
 ├─ 出题
-│   ├─ 选择题 → 用户答后全选项解析
-│   └─ 简答题 → 给出参考要点
+│   ├─ 检索 exam-index.json → 按知识点匹配真题
+│   │   ├─ 有匹配真题 → 展示元信息 + to_images 截图原题
+│   │   └─ 无匹配 → Skill 自出题
+│   ├─ 选择题 → 用户答后 Skill 自写全选项解析
+│   ├─ 问"要看官方解析吗？"→ 用户确认后用 pdfcraft 提取答案 PDF
+│   └─ 答题后 → update-question 实时写 JSON（做题记录）
 │
 ├─ 纠错（用户答错时）
 │   └─ 四步法 + ⑤易错汇总
@@ -192,10 +210,12 @@ description: 考研408（数据结构、计算机组成原理、操作系统、�
 - 易错辨析必须基于**真实考试中学生的典型错误**（优先参考 common-mistakes-archive.md）
 - 跨科拓展链接必须**具体**（不能只说"这也涉及OS"，要说"这涉及OS的内存管理章节的页表机制"）
 
-### PDF 真题预留对接
-- 后续用户提供真题 PDF 后，通过 `scripts/exam-pdf-loader.js` 解析 + 缓存
-- 解析后的结构化为 JSON 索引，存放在 `references/exam-archive/`（预留目录）
-- 出题时优先从真题库检索匹配当前知识点的题目
+### 真题库集成
+- 真题 PDF 位于 `data/exams/`（2009-2025，共 17 份），答案 PDF 位于 `data/answers/`
+- PDF 文本提取通过 `scripts/pdfcraft/pdfcraft.py`（需先运行 `scripts/pdfcraft/setup.bat` 初始化 Python venv）
+- 真题索引存放在 `references/exam-archive/exam-index.json`（倒排索引：知识点→年份+题号）
+- 出题时优先检索真题库，匹配到真题则用 `to_images` 截图展示原题；无匹配则由 Skill 自出题
+- 答案按需提取：用户作答后，按年份+题号从答案 PDF 中提取对应解析
 
 ### 学习画像 JSON 约束
 - 画像文件位置：当前工作目录下 `.408-mentor/profile.json`（用户可开多个工作目录实现分科隔离）
@@ -226,11 +246,19 @@ description: 考研408（数据结构、计算机组成原理、操作系统、�
 - `cross-subject-graph.md` — 跨科目知识联结点图谱
 - `common-mistakes-archive.md` — 四科高频易错点档案
 - `answer-template.md` — 回答结构模板与示例
+- `exam-archive/` — 真题索引数据（倒排索引 JSON，由索引构建流程生成）
 
 ### scripts/
 - `profile-manager.js` — 学习画像 JSON 读写工具（read/init/update-question/update-level/reset）
 - `build-keyword-index.js` — 从考纲数据构建/更新术语索引
-- `exam-pdf-loader.js` — 真题 PDF 解析/缓存工具（预留）
+- `exam-pdf-loader.js` — 真题 PDF 批量索引构建工具
+- `pdfcraft/` — PDF 处理引擎（从 PDF-Craft skill 提取）
+  - `pdfcraft.py` — CLI 入口，50 个命令（extract_text / to_images / schema_extract / chat_pdf 等）
+  - `setup.bat` — 初始化 Python venv（首次使用前运行）
+
+### data/
+- `exams/` — 17 年真题 PDF（2009-2025）
+- `answers/` — 17 年答案 PDF（2009-2025-answer）
 
 ### examples/
 - `example-dialogs.md` — 多轮对话示例（覆盖不同水平+不同科目）
