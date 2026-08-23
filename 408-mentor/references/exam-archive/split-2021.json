@@ -1,0 +1,331 @@
+[
+  {
+    "year": 2021,
+    "number": 1,
+    "type": "choice",
+    "rawText": "已知头指针h 指向一个带头结点的非空单循环链表，结点结构为 data \r\n next ，其中next 是指向\r\n直接后继结点的指针，p 是尾指针，q 是临时指针。现要删除该链表的第一个元素，正确的语句\r\n序列是        。 \r\nA. h->next = h->next->next; q=h->next; free(q); \r\nB. q=h->next; h->next = h->next->next; free(q); \r\nC. q=h->next; h->next = q->next; if(p!=q)p=h; free(q); \r\nD. q=h->next; h->next = q->next; if(p==q)p=h; free(q);",
+    "examPage": 1
+  },
+  {
+    "year": 2021,
+    "number": 2,
+    "type": "choice",
+    "rawText": "已知初始为空的队列Q 的一端仅能进行入队操作，另外一端既能进行入队操作又能进行出队操\r\n作。若Q 的入队序列是1, 2, 3, 4, 5, 则不能得到的出队序列是        。 \r\nA. 5, 4, 3, 1, 2 \r\nB. 5, 3, 1, 2, 4 \r\nC. 4, 2, 1, 3, 5 \r\nD. 4, 1, 3, 2, 5",
+    "examPage": 1
+  },
+  {
+    "year": 2021,
+    "number": 3,
+    "type": "choice",
+    "rawText": "已知二维数组A 按行优先方式存储，每个元素占用1 个存储单元。若元素A[0][0]的存储地址是\r\n100，A[3][3]的存储地址是220，则元素A[5][5]的存储地址是        。 \r\nA. 295 \r\nB. 300 \r\nC. 301 \r\nD. 306",
+    "examPage": 1
+  },
+  {
+    "year": 2021,
+    "number": 4,
+    "type": "choice",
+    "rawText": "某森林F 对应的二叉树为T，若T 的先序遍历序列是a, b, d, c, e, g, f，中序遍历序列是b, d, a, e, \r\ng, c, f，则F 中树的棵树是        。 \r\nA. 1 \r\nB. 2 \r\nC. 3 \r\nD. 4",
+    "examPage": 1
+  },
+  {
+    "year": 2021,
+    "number": 5,
+    "type": "choice",
+    "rawText": "若某二叉树有5 个叶结点，其权值分别为10, 12, 16, 21, 30，则其最小的带权路径长度（WPL）\r\n是        。 \r\nA. 89 \r\nB. 200 \r\nC. 208 \r\nD. 289",
+    "examPage": 1
+  },
+  {
+    "year": 2021,
+    "number": 6,
+    "type": "choice",
+    "rawText": "给定平衡二叉树如下图所示，插入关键字23 后，根中的关键字是        。 \r\n \r\nA. 16 \r\nB. 20 \r\nC. 23 \r\nD. 25",
+    "examPage": 1
+  },
+  {
+    "year": 2021,
+    "number": 7,
+    "type": "choice",
+    "rawText": "给定如下有向图，该图的拓扑有序序列的个数是        。 \r\n \r\nA. 1 \r\nB. 2 \r\nC. 3 \r\nD. 4",
+    "examPage": 1
+  },
+  {
+    "year": 2021,
+    "number": 8,
+    "type": "choice",
+    "rawText": "使用Dijkstra 算法求下图中从顶点1 到其余各顶点的最短路径，将当前找到的从顶点1 到顶点2, \r\n3, 4, 5 的最短路径长度保存在数组dist 中，求出第二条最短路径后，dist 中的内容更新\r\n为        。 \r\n\r\n\r\n=== 第 2 页 ===\r\n2021 年全国硕士研究生入学统一考试计算机学科专业基础综合试题 第 2 页（共 11 页） \r\n \r\nA. 26, 3, 14, 6 \r\nB. 25, 3, 14, 6 \r\nC. 21, 3, 14, 6 \r\nD. 15, 3, 14, 6",
+    "examPage": 1
+  },
+  {
+    "year": 2021,
+    "number": 9,
+    "type": "choice",
+    "rawText": "在一棵高度为3 的3 阶B 树中，根为第1 层，若第2 层中有4 个关键字，则该树的结点个数最\r\n多是        。 \r\nA. 11 \r\nB. 10 \r\nC. 9 \r\nD. 8",
+    "examPage": 2
+  },
+  {
+    "year": 2021,
+    "number": 10,
+    "type": "choice",
+    "rawText": "设数组S[]={93, 946, 372, 9, 146, 151, 301, 485, 236, 327, 43, 892}，采用最低位优先（LSD）基数\r\n排序将S 排列成升序序列。第1 趟分配、收集后，元素372 之前、之后紧邻的元素分别\r\n是        。 \r\nA. 43, 892 \r\nB. 236, 301 \r\nC. 301, 892 \r\nD. 485, 301",
+    "examPage": 2
+  },
+  {
+    "year": 2021,
+    "number": 11,
+    "type": "choice",
+    "rawText": "将关键字6, 9, 1, 5, 8, 4, 7 依次插入到初始为空的大根堆H 中，得到的H 是        。 \r\nA. 9, 8, 7, 6, 5, 4, 1 \r\nB. 9, 8, 7, 5, 6, 1, 4 \r\nC. 9, 8, 7, 5, 6, 4, 1 \r\nD. 9, 6, 7, 5, 8, 4, 1",
+    "examPage": 2
+  },
+  {
+    "year": 2021,
+    "number": 12,
+    "type": "choice",
+    "rawText": "2017 年公布的全球超级计算机TOP 500 排名中，我国“神威•太湖之光”超级计算机蝉联第一，\r\n其浮点运算速度为93.0146PFLOPS,说明该计算机每秒钟内完成的浮点操作次数约为        。 \r\nA. 9.3×10\r\n13次 \r\nB. 9.3×10\r\n15次 \r\nC. 9.3 千万亿次 \r\nD. 9.3 亿亿次",
+    "examPage": 2
+  },
+  {
+    "year": 2021,
+    "number": 13,
+    "type": "choice",
+    "rawText": "已知带符号整数用补码表示，变量x, y, z 的机器数分别为FFFDH, FFDFH, 7FFCH，下列结论\r\n中，正确的是        。 \r\nA. 若x, y 和z 为无符号整数，则z＜x＜y \r\nB. 若x, y 和z 为无符号整数，则x＜y＜z \r\nC. 若x, y 和z 为带符号整数，则x＜y＜z \r\nD. 若x, y 和z 为带符号整数，则y＜x＜z",
+    "examPage": 2
+  },
+  {
+    "year": 2021,
+    "number": 14,
+    "type": "choice",
+    "rawText": "下列数值中，不能用IEEE 754 浮点格式精确表示的         。 \r\nA. 1.2 \r\nB. 1.25 \r\nC. 2.0 \r\nD. 2.5",
+    "examPage": 2
+  },
+  {
+    "year": 2021,
+    "number": 15,
+    "type": "choice",
+    "rawText": "某计算机的存储器总线中有24 位地址线和32 位数据线，按字编址，字长为32 位。如果00 \r\n0000H～3F FFFFH 为RAM 区，那么需要512K×8 位的RAM 芯片数为        。 \r\nA. 8 \r\nB. 16 \r\nC. 32 \r\nD. 64",
+    "examPage": 2
+  },
+  {
+    "year": 2021,
+    "number": 16,
+    "type": "choice",
+    "rawText": "若计算机主存地址为32 位，按字节编址，Cache 数据区大小为32KB，主存块大小为32B，采用\r\n直接映射方式和回写（Write Back）策略，则Cache 行的位数至少是        。 \r\nA. 275 \r\nB. 274 \r\nC. 258 \r\nD. 257",
+    "examPage": 2
+  },
+  {
+    "year": 2021,
+    "number": 17,
+    "type": "choice",
+    "rawText": "下列寄存器中，汇编语言程序员可见的        。 \r\nI. 指令寄存器 \r\nII. 微指令寄存器 \r\nIII. 基址寄存器 \r\nIV. 标志/状态寄存器 \r\nA. 仅I、II \r\nB. 仅I、IV \r\nC. 仅II、IV \r\nD. 仅III、IV",
+    "examPage": 2
+  },
+  {
+    "year": 2021,
+    "number": 18,
+    "type": "choice",
+    "rawText": "下列关于数据通路的叙述中，错误的是        。 \r\nA. 数据通路包含ALU 等组合逻辑（操作）元件 \r\nB. 数据通路包含寄存器等时序逻辑（状态）元件 \r\nC. 数据通路不包含用于异常事件检测及响应的电路 \r\nD. 数据通路中的数据流动路径由控制信号进行控制",
+    "examPage": 2
+  },
+  {
+    "year": 2021,
+    "number": 19,
+    "type": "choice",
+    "rawText": "下列关于总线的叙述中，错误的是        。 \r\nA. 总线是在两个或多个部件之间进行数据交换的传输介质 \r\nB. 同步总线由时钟信号定时，时钟频率不一定等于工作频率 \r\nC. 异步总线由握手信号定时，一次握手过程完成一位数据交换 \r\nD. 突发（Burst）传送总线事务可以在总线上连续传送多个数据",
+    "examPage": 2
+  },
+  {
+    "year": 2021,
+    "number": 20,
+    "type": "choice",
+    "rawText": "下列选项中，不属于I/O 接口的是        。 \r\nA. 磁盘驱动器 \r\nB. 打印机适配器 \r\nC. 网络控制器 \r\nD. 可编程中断控制器 \r\n\r\n\r\n=== 第 3 页 ===\r\n2021 年全国硕士研究生入学统一考试计算机学科专业基础综合试题 第 3 页（共 11 页）",
+    "examPage": 2
+  },
+  {
+    "year": 2021,
+    "number": 21,
+    "type": "choice",
+    "rawText": "异常事件在当前指令执行过程中进行检测，中断请求则在当前指令执行后进行检测。下列事件\r\n中，相应处理程序执行后，必须回到当前指令重新执行的是        。 \r\nA. 系统调用 \r\nB. 页缺失 \r\nC. DMA 传送结束 \r\nD. 打印机缺纸",
+    "examPage": 3
+  },
+  {
+    "year": 2021,
+    "number": 22,
+    "type": "choice",
+    "rawText": "下列是关于多重中断系统中CPU 响应中断的叙述，其中错误的是        。 \r\nA. 仅在用户态（执行用户程序）下，CPU 才能检测和响应中断 \r\nB. CPU 只有在检测到中断请求信号后，才会进入中断响应周期 \r\nC. 进入中断响应周期时，CPU 一定处于中断允许（开中断）状态 \r\nD. 若CPU 检测到中断请求信号，则一定存在未被屏蔽的中断源请求信号",
+    "examPage": 3
+  },
+  {
+    "year": 2021,
+    "number": 23,
+    "type": "choice",
+    "rawText": "下列指令中，只能在内核态执行的是        。 \r\nA. trap 指令 \r\nB. I/O 指令 \r\nC. 数据传送指令 \r\nD. 设置断点指令",
+    "examPage": 3
+  },
+  {
+    "year": 2021,
+    "number": 24,
+    "type": "choice",
+    "rawText": "下列操作中，操作系统在创建新进程时，必须完成的是        。 \r\nI. 申请空白的进程控制块 \r\nII. 初始化进程控制块 \r\nIII. 设置进程状态为执行态 \r\nA. 仅I \r\nB. 仅I、II \r\nC. 仅I、III \r\nD. 仅II、III",
+    "examPage": 3
+  },
+  {
+    "year": 2021,
+    "number": 25,
+    "type": "choice",
+    "rawText": "下列内核的数据结构或程序中，分时系统实现时间片轮转调度需要使用的是        。 \r\nI. 进程控制块 \r\nII. 时钟中断处理程序 III. 进程就绪队列 \r\nIV. 进程阻塞队列 \r\nA. 仅II、III \r\nB. 仅I、IV \r\nC. 仅I、II、III \r\nD. 仅I、II、IV",
+    "examPage": 3
+  },
+  {
+    "year": 2021,
+    "number": 26,
+    "type": "choice",
+    "rawText": "某系统中磁盘的磁道数为200（0～199），磁头当前在184 号磁道上。用户进程提出的磁盘访问\r\n请求对应的磁道号依次为184, 187, 176, 182, 199。若采用最短寻道时间优先调度算法（SSTF）完\r\n成磁盘访问，则磁头移动的距离（磁道数）是        。 \r\nA. 37 \r\nB. 38 \r\nC. 41 \r\nD. 42",
+    "examPage": 3
+  },
+  {
+    "year": 2021,
+    "number": 27,
+    "type": "choice",
+    "rawText": "下列事件中，可能引起进程调度程序执行的是        。 \r\nI. 中断处理结束 \r\nII. 进程阻塞 \r\nIII. 进程执行结束 \r\nIV. 进程的时间片用完 \r\nA. 仅I、III \r\nB. 仅II、IV \r\nC. 仅III、IV \r\nD. I、II、III 和IV",
+    "examPage": 3
+  },
+  {
+    "year": 2021,
+    "number": 28,
+    "type": "choice",
+    "rawText": "某请求分页存储系统的页大小为4KB，按字节编址。系统给进程P 分配2 个固定的页框，并采\r\n用改进型Clock 置换算法，进程P 页表的部分内容如下表所示。 \r\n页号页框号\r\n存在位 \r\n1：存在，0：不存在\r\n访问位 \r\n1：访问，0：未访问\r\n修改位 \r\n1：修改，0：未修改\r\n…\r\n… \r\n… \r\n… \r\n… \r\n2 \r\n20H \r\n0 \r\n0 \r\n0 \r\n3 \r\n60H \r\n1 \r\n1 \r\n0 \r\n4 \r\n80H \r\n1 \r\n1 \r\n1 \r\n…\r\n… \r\n… \r\n… \r\n… \r\n若P 访问虚拟地址为02A01H 的存储单元，则经地址变换后得到的物理地址是        。 \r\nA. 00A01H \r\nB. 20A01H \r\nC. 60A01H \r\nD. 80A01H",
+    "examPage": 3
+  },
+  {
+    "year": 2021,
+    "number": 29,
+    "type": "choice",
+    "rawText": "在采用二级页表的分页系统中，CPU 页表基址寄存器中的内容是        。 \r\nA. 当前进程的一级页表的起始虚拟地址 \r\nB. 当前进程的一级页表的起始物理地址 \r\nC. 当前进程的二级页表的起始虚拟地址 \r\nD. 当前进程的二级页表的起始物理地址",
+    "examPage": 3
+  },
+  {
+    "year": 2021,
+    "number": 30,
+    "type": "choice",
+    "rawText": "若目录dir 下有文件file1，则为删除该文件内核不必完成的工作是        。 \r\nA. 删除file1 的快捷方式 \r\nB. 释放file1 的文件控制块 \r\nC. 释放file1 占用的磁盘空间 \r\nD. 删除目录dir 中与file1 对应的目录项",
+    "examPage": 3
+  },
+  {
+    "year": 2021,
+    "number": 31,
+    "type": "choice",
+    "rawText": "若系统中有n（n≥2）个进程，每个进程均需要使用某类临界资源2 个，则系统不会发生死锁所\r\n需的该类资源总数至少是        。 \r\nA. 2 \r\nB. n \r\nC. n + 1 \r\nD. 2n",
+    "examPage": 3
+  },
+  {
+    "year": 2021,
+    "number": 32,
+    "type": "choice",
+    "rawText": "下列选项中，通过系统调用完成的操作是        。 \r\n\r\n\r\n=== 第 4 页 ===\r\n2021 年全国硕士研究生入学统一考试计算机学科专业基础综合试题 第 4 页（共 11 页） \r\nA. 页置换 \r\nB. 进程调度 \r\nC. 创建新进程 \r\nD. 生成随机整数",
+    "examPage": 3
+  },
+  {
+    "year": 2021,
+    "number": 33,
+    "type": "choice",
+    "rawText": "在TCP/IP 参考模型中，由传输层相邻的下一层实现的主要功能        。 \r\nA. 对话管理 \r\nB. 路由选择 \r\nC. 端到端报文段传输 D. 结点到结点流量控制",
+    "examPage": 4
+  },
+  {
+    "year": 2021,
+    "number": 34,
+    "type": "choice",
+    "rawText": "若下图为一段差分曼彻斯特编码信号波形，则其编码的二进制位串是        。 \r\n \r\nA. 1011 1001 \r\nB. 1101 0001 \r\nC. 0010 1110 \r\nD. 1011 0110",
+    "examPage": 4
+  },
+  {
+    "year": 2021,
+    "number": 35,
+    "type": "choice",
+    "rawText": "现将一个IP 网络划分为3 个子网，若其中一个子网是192.168.9.128/26，则下列网络中，不可能\r\n是另外两个子网之一的是        。 \r\nA. 192.168.9.0/25 \r\nB. 192.168.9.0/26 \r\nC. 192.168.9.192/26 \r\nD. 192.168.9.192/27",
+    "examPage": 4
+  },
+  {
+    "year": 2021,
+    "number": 36,
+    "type": "choice",
+    "rawText": "若路由器向MTU = 800B 的链路转发一个总长度为1580B 的IP 数据报（首部长度为20B）时，\r\n进行了分片，且每个分片尽可能大，则第2 个分片的总长度字段和MF 标志位的值分别\r\n是        。 \r\nA. 796, 0 \r\nB. 796, 1 \r\nC. 800, 0 \r\nD. 800, 1",
+    "examPage": 4
+  },
+  {
+    "year": 2021,
+    "number": 37,
+    "type": "choice",
+    "rawText": "某网络中的所有路由器均采用距离向量路由算法计算路由。若路由器E 与邻居路由器A, B, C 和\r\nD 之间的直接链路距离分别是8, 10, 12 和6, 且E 收到邻居路由器的距离向量如下表所示，则路\r\n由器E 更新后的到达目的网络Net1～Net4 的距离分别是        。 \r\n目的网络\r\nA 的距离向量\r\nB 的距离向量\r\nC 的距离向量\r\nD 的距离向量\r\nNet1 \r\n1 \r\n23 \r\n20 \r\n22 \r\nNet2 \r\n12 \r\n35 \r\n30 \r\n28 \r\nNet3 \r\n24 \r\n18 \r\n16 \r\n36 \r\nNet4 \r\n36 \r\n30 \r\n8 \r\n24 \r\nA. 9, 10, 12, 6 \r\nB. 9, 10, 28, 20 \r\nC. 9, 20, 12, 20 \r\nD. 9, 20, 28, 20",
+    "examPage": 4
+  },
+  {
+    "year": 2021,
+    "number": 38,
+    "type": "choice",
+    "rawText": "若客户首先向服务器发送FIN 段请求断开TCP 连接，则当客户收到服务器发送的FIN 段并向服\r\n务器发送了ACK 段后，客户的TCP 状态转换为        。 \r\nA. CLOSE_WAIT \r\nB. TIME_WAIT \r\nC. FIN_WAIT_1 \r\nD. FIN_WAIT_2",
+    "examPage": 4
+  },
+  {
+    "year": 2021,
+    "number": 39,
+    "type": "choice",
+    "rawText": "若大小为12B 的应用层数据分别通过1 个UDP 数据报和1 个TCP 段传输，则该UDP 数据报和\r\nTCP 段实现的有效载荷（应用层数据）最大传输效率分别是        。 \r\nA. 37.5%, 16.7%  \r\nB. 37.5%, 37.5% \r\nC. 60.0%, 16.7% \r\nD. 60.0%, 37.5%",
+    "examPage": 4
+  },
+  {
+    "year": 2021,
+    "number": 40,
+    "type": "choice",
+    "rawText": "设主机甲通过TCP 向主机乙发送数据，部分过程如下图所示。甲在t0时刻发送一个序号seq = \r\n501、封装200B 数据的段，在t1时刻收到乙发送的序号seq = 601、确认序号ack_seq = 501、接\r\n收窗口rcvwnd = 500B 的段，则甲在未收到新的确认段之前，可以继续向乙发送的数据序号范围\r\n是        。 \r\n \r\nA. 501～1000 \r\nB. 601～1100 \r\nC. 701～1000 \r\nD. 801～1100\r\n\r\n\r\n=== 第 5 页 ===\r\n2021 年全国硕士研究生入学统一考试计算机学科专业基础综合试题 第 5 页（共 11 页）",
+    "examPage": 4
+  },
+  {
+    "year": 2021,
+    "number": 41,
+    "type": "comprehensive",
+    "rawText": "（15 分）已知无向连通图G 由顶点集V 和边集E 组成，|E| > 0 ,当G 中度为奇数的顶点个数为不\r\n大于2 的偶数时，G 存在包含所有边且长度为|E|的路径（称为EL 路径）。设图G 采用邻接矩阵\r\n存储，类型定义如下： \r\ntypedef struct{ \r\n \r\n \r\n \r\n \r\n//图的定义 \r\n    int numVertices, numEdges; \r\n  \r\n \r\n \r\n \r\n \r\n \r\n \r\n \r\n \r\n//图中实际顶点数和边数 \r\n    char VerticesList[MAXV]; \r\n  \r\n \r\n \r\n \r\n \r\n \r\n \r\n \r\n \r\n//顶点表。MAXV 为已定义常量 \r\n    int Edge[MAXV][MAXV]; \r\n  \r\n \r\n \r\n \r\n \r\n \r\n \r\n \r\n \r\n//邻接矩阵 \r\n}MGraph \r\n请设计算法int IsExistEL(MGraph G)，判断G 是否存在EL 路径，若存在，则返回1，否\r\n则返回0。要求： \r\n（1）给出算法的基本设计思想。 \r\n（2）根据设计思想，采用C 或C++语言描述算法，关键之处给出注释。 \r\n（3）说明你所设计算法的时间复杂度和空间复杂度。 \r\n \r\n \r\n \r\n\r\n\r\n=== 第 6 页 ===\r\n2021 年全国硕士研究生入学统一考试计算机学科专业基础综合试题 第 6 页（共 11 页）",
+    "examPage": 5
+  },
+  {
+    "year": 2021,
+    "number": 42,
+    "type": "comprehensive",
+    "rawText": "（8 分）已知某排序算法如下： \r\nvoid cmpCountSort(int a[], int b[], int n) \r\n{   int i,j,*count; \r\n    count=(int *)malloc(sizeof(int)*n); \r\nfor(i=0;i<n;i++)    count[i]=0; \r\nfor(i=0;i<n-1;i++) \r\n    for(j=i+1;j<n;j++) \r\n        if(a[i]<a[j])   count[j]++; \r\n        else              count[i]++; \r\nfor(i=0;i<n;i++)    b[count[i]]=a[i]; \r\nfree(count); \r\n} \r\n请回答下列问题 \r\n（1）若有int a[] = {25,-10,25,10,11,19},b[6];，则调用cmpCountSort(a,b,6)\r\n后数组b 中的内容是什么？ \r\n（2）若a 中含有n 个元素，则算法执行过程中，元素之间的比较次数是多少？ \r\n（3）该算法是稳定的吗？若是，则阐述理由；否则，修改为稳定排序算法。 \r\n \r\n \r\n\r\n\r\n=== 第 7 页 ===\r\n2021 年全国硕士研究生入学统一考试计算机学科专业基础综合试题 第 7 页（共 11 页）",
+    "examPage": 6
+  },
+  {
+    "year": 2021,
+    "number": 43,
+    "type": "comprehensive",
+    "rawText": "（13 分）假定计算机M 字长为16 位，按字节编址，连接CPU 和主存的系统总线中地址线为20\r\n位、数据线为8 位，采用16 位定长指令字，指令格式及其说明如下： \r\n格式\r\n6 位 \r\n2 位\r\n2 位\r\n2 位\r\n4 位\r\n指令功能或指令类型说明 \r\nR 型\r\n000000\r\nrs \r\nrt \r\nrd \r\nop1\r\nR[rd]←R[rs] op1 R[rt] \r\nI 型\r\nop2 \r\nrs \r\nrt \r\nimm \r\n含ALU 运算、条件转移和访存操作3 类指令\r\nJ 型\r\nop3 \r\ntarget \r\nPC 的低10 位←target \r\n其中，op1～op3 为操作码，rs, rt 和rd 为通用寄存器编号，R[r]表示寄存器r 的内容，imm 为立\r\n即数，target 为转移目标的形式地址。请回答下列问题。 \r\n（1）ALU 的宽度是多少位？可寻址主存空间大小为多少字节？指令寄存器、主存地址寄存器\r\n（MAR）和主存数据寄存器（MDR）分别应有多少位？ \r\n（2）R 型格式最多可定义多少种操作？I 型和J 型格式总共最多可定义多少种操作？通用寄存器\r\n最多有多少个？ \r\n（3）假定op1 为0010 和0011 时，分别表示带符号整数减法和带符号整数乘法指令，则指令\r\n01B2H 的功能是什么（参考上述指令功能说明的格式进行描述）？若1, 2, 3 号通用寄存器当前\r\n内容分别为B052H, 0008H, 0020H ,则分别执行指令01B2H 和01B3H 后，3 号通用寄存器内容各\r\n是什么？各自结果是否溢出？ \r\n（4）若采用I 型格式的访存指令中imm（偏移量）为带符号整数，则地址计算时应对imm 进行\r\n零扩展还是符号扩展？ \r\n（5）无条件转移指令可以采用上述哪种指令格式？ \r\n \r\n \r\n\r\n\r\n=== 第 8 页 ===\r\n2021 年全国硕士",
+    "examPage": 7
+  },
+  {
+    "year": 2021,
+    "number": 44,
+    "type": "comprehensive",
+    "rawText": "（8 分）假设计算机M 的主存地址为24 位，按字节编址；采用分页存储管理方式，虚拟地址为\r\n30 位，页大小为4KB；TLB 采用2 路组相联方式和LRU 替换策略，共8 组。请回答下列问题。 \r\n（1）虚拟地址中哪几位表示虚页号？哪几位表示页内地址？ \r\n（2）已知访问TLB 时虚页号高位部分用作TLB 标记，低位部分用作TLB 组号，M 的虚拟地址\r\n中哪几位是TLB 标记？哪几位是TLB 组号？ \r\n（3）假设TLB 初始时为空，访问的虚页号依次为10, 12, 16, 7, 26, 4, 12 和20 ,在此过程中，哪\r\n一个虚页号对应的TLB 表项被替换？说明理由。 \r\n（4）若将M 中的虚拟地址位数增加到32 位，则TLB 表项的位数增加几位？\r\n\r\n\r\n=== 第 9 页 ===\r\n2021 年全国硕士研究生入学统一考试计算机学科专业基础综合试题 第 9 页（共 11 页）",
+    "examPage": 8
+  },
+  {
+    "year": 2021,
+    "number": 45,
+    "type": "comprehensive",
+    "rawText": "（7 分）下表给出了整型信号量S 的wait()和signal()操作的功能描述，以及采用开/关中断指令实\r\n现信号量操作互斥的两种方法。 \r\n功能描述 \r\n方法1 \r\n方法2 \r\nSemaphore S; \r\nwait(S){ \r\n  while(S<=0); \r\n  S=S-1; \r\n} \r\n \r\n \r\n \r\n \r\n \r\nsignal(S){ \r\n  S=S+1; \r\n} \r\nSemaphore S; \r\nwait(S){ \r\n关中断; \r\nWhile(S<=0); \r\nS=S-1; \r\n开中断; \r\n} \r\n \r\n \r\n \r\nsignal(S){ \r\n  关中断; \r\n  S=S+1; \r\n  开中断; \r\n} \r\nSemaphore S; \r\nwait(S){ \r\n  关中断; \r\n  while(S<=0){ \r\n  开中断; \r\n  关中断; \r\n  } \r\n  S=S-1; \r\n  开中断; \r\n} \r\nsignal(S){ \r\n  关中断; \r\n  S=S+1; \r\n  开中断; \r\n} \r\n请回答下列问题。 \r\n（1）为什么在wait()和signal()操作中对信号量S 的访问必须互斥执行？ \r\n（2）分别说明方法1 和方法2 是否正确。若不正确，请说明理由。 \r\n（3）用户程序能否使用开/关中断指令实现临界区互斥？为什么？ \r\n \r\n \r\n\r\n\r\n=== 第 10 页 ===\r\n2021 年全国硕士研究生入学统一考试计算机学科专业基础综合试题 第 10 页（共 11 页）",
+    "examPage": 9
+  },
+  {
+    "year": 2021,
+    "number": 46,
+    "type": "comprehensive",
+    "rawText": "（8 分）某计算机用硬盘作为启动盘，硬盘第一个扇区存放主引导记录，其中包含磁盘引导程序\r\n和分区表。磁盘引导程序用于选择引导哪个分区的操作系统，分区表记录硬盘上各分区的位置等\r\n描述信息。硬盘被划分成若干个分区，每个分区的第一个扇区存放分区引导程序，用于引导该分\r\n区中的操作系统。系统采用多阶段引导方式，除了执行磁盘引导程序和分区引导程序外，还需要\r\n执行ROM 中的引导程序。请回答下列问题。 \r\n（1）系统启动过程中操作系统的初始化程序、分区引导程序、ROM 中的引导程序、磁盘引导程\r\n序的执行顺序是什么？ \r\n（2）把硬盘制作为启动盘时，需要完成操作系统的安装、磁盘的物理格式化、逻辑格式化、对\r\n磁盘进行分区，执行这4 个操作的正确顺序是什么？ \r\n（3）磁盘扇区的划分和文件系统根目录的建立分别是在第（2）问的哪个操作中完成的？ \r\n \r\n \r\n \r\n\r\n\r\n=== 第 11 页 ===\r\n2021 年全国硕士研究生入学统一考试计算机学科专业基础综合试题 第 11 页（共 11 页）",
+    "examPage": 10
+  },
+  {
+    "year": 2021,
+    "number": 47,
+    "type": "comprehensive",
+    "rawText": "（9 分）某网络拓扑如题47 图所示，以太网交换机S 通过路由器R 与Internet 互联。路由器部分\r\n接口、本地域名服务器、H1、H2 的IP 地址和MAC 地址如图中所示。在t0时刻H1 的ARP 表和\r\nS 的交换表均为空，H1 在此刻利用浏览器通过域名www.abc.com 请求访问Web 服务器，在t1时\r\n刻（t1>t0）S 第一次收到了封装HTTP 请求报文的以太网帧，假设从t0到t1期间网络未发生任何\r\n与此次Web 访问无关的网络通信。 \r\n \r\n题47 题图 \r\n请回答下列问题。 \r\n（1）从t0到t1期间，H1 除了HTTP 之外还运行了哪个应用层协议？从应用层到数据链路层，该\r\n应用层协议报文是通过哪些协议进行逐层封装的？ \r\n（2）若S 的交换表结构为<MAC 地址，端口>，则t1时刻S 交换表的内容是什么？ \r\n（3）从t0到t1期间，H2 至少会接收到几个与此次Web 访问相关的帧？接收到的是什么帧？帧的\r\n目的MAC 地址是什么？",
+    "examPage": 11
+  }
+]
