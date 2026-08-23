@@ -83,8 +83,8 @@ def extract_text_pymupdf(pdf_path, page_num):
     return text
 
 
-def ocr_page(pdf_path, page_num, dpi=200):
-    """OCR 识别单个页面"""
+def ocr_page(pdf_path, page_num, dpi=300):
+    """OCR 识别单个页面（300dpi：对中文正文的术语识别明显好于 200，如"逻辑"不再误识为"允辑"）"""
     if not HAS_OCR:
         return ""
     
