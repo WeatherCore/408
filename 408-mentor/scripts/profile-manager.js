@@ -138,6 +138,52 @@ function writeProfile(profile) {
 }
 
 /**
+ * 画像写锁：读-改-写不是原子的，两个 update-question 并发会互相覆盖丢记录。
+ * 用独占创建的锁文件串行化变更命令；写入方崩溃留下的陈旧锁超过阈值后自动打破。
+ */
+const LOCK_TIMEOUT_MS = 8000;
+const LOCK_STALE_MS = 10000;
+
+function acquireProfileLock() {
+  // 全新目录下 PROFILE_DIR 可能尚不存在（init 前创建锁文件会 ENOENT）
+  fs.mkdirSync(PROFILE_DIR, { recursive: true });
+  const lockPath = PROFILE_PATH + '.lock';
+  const deadline = Date.now() + LOCK_TIMEOUT_MS;
+  for (;;) {
+    try {
+      fs.closeSync(fs.openSync(lockPath, 'wx'));
+      // 注意：校验失败等路径会在持锁区 process.exit(1)，finally 不会执行；
+      // exit 钩子是同步回调、process.exit 时仍会触发，用它兜底释放锁
+      process.on('exit', () => {
+        try { fs.unlinkSync(lockPath); } catch { /* 已不存在则忽略 */ }
+      });
+      return lockPath;
+    } catch (e) {
+      if (e.code !== 'EEXIST') throw e;
+      let stale = false;
+      try {
+        const st = fs.statSync(lockPath);
+        stale = Date.now() - st.mtimeMs > LOCK_STALE_MS;
+      } catch { /* 锁刚好被释放，直接重试 */ }
+      if (stale) {
+        fs.unlinkSync(lockPath);
+        continue;
+      }
+      if (Date.now() > deadline) {
+        console.error(`[ERROR] 画像被并发操作锁定，等待 ${LOCK_TIMEOUT_MS}ms 超时：${lockPath}`);
+        process.exit(1);
+      }
+      const waitUntil = Date.now() + 50;
+      while (Date.now() < waitUntil) { /* 忙等重试，CLI 场景可接受 */ }
+    }
+  }
+}
+
+function releaseProfileLock(lockPath) {
+  try { fs.unlinkSync(lockPath); } catch { /* 已不存在则忽略 */ }
+}
+
+/**
  * 根据 questionLog 重新计算 weakTopics。
  * 规则：对每个 topic，取最近 WINDOW 条记录；若 total >= MIN_ATTEMPTS 且 correctRate < 0.5，则视为弱项。
  * 已不再是弱项的 topic 会被移除。
@@ -199,8 +245,13 @@ function updateQuestion(chapter, topic, correct, difficulty) {
     console.error(`[ERROR] 无效难度：${difficulty}（应为 easy|medium|hard）`);
     process.exit(1);
   }
+  // 严格校验：非规范值直接拒绝而不是静默记为答错（画像数据宁可拒绝不可错记）
+  if (correct !== 'true' && correct !== 'false') {
+    console.error(`[ERROR] 无效 correct 值：${correct}（应为 true|false，严格小写）`);
+    process.exit(1);
+  }
 
-  const isCorrect = correct === true || correct === 'true';
+  const isCorrect = correct === 'true';
   const entry = {
     timestamp: new Date().toISOString(),
     chapter,
@@ -318,7 +369,8 @@ function main() {
   const command = rest[0];
   const flags = parseFlags(rest.slice(1));
 
-  switch (command) {
+  const runCommand = () => {
+    switch (command) {
     case 'read': {
       const p = readProfile();
       console.log(JSON.stringify(p, null, 2));
@@ -365,6 +417,20 @@ function main() {
       console.error('  [--cwd <目录>] update-level --level <beginner|review|sprint> --reason <user_declared|phrasing_escalation|phrasing_downgrade>');
       console.error('  [--cwd <目录>] reset');
       process.exit(1);
+    }
+  };
+
+  // 变更类命令用写锁串行化，防并发读-改-写互相覆盖
+  const MUTATING = new Set(['init', 'update-question', 'update-level', 'reset']);
+  if (MUTATING.has(command)) {
+    const lockPath = acquireProfileLock();
+    try {
+      runCommand();
+    } finally {
+      releaseProfileLock(lockPath);
+    }
+  } else {
+    runCommand();
   }
 }
 
