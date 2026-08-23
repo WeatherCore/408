@@ -1,0 +1,48 @@
+{
+  "version": "1",
+  "description": "408 多科大联结点（跨科综合题高发区）。用于冲刺模式下识别当前知识点是否为综合题常客，并据此推荐跨科联动真题或自出题。",
+  "hubs": [
+    {
+      "id": "vm-cache-tlb",
+      "name": "虚拟内存 + Cache + TLB",
+      "subjects": ["os", "co"],
+      "keywords": ["虚拟内存", "Cache", "TLB", "页表", "地址转换", "MMU", "缺页中断", "页框号"],
+      "typicalQuestion": "给出虚拟地址 → 经过 TLB → 查页表 → 得到物理地址 → 再查 Cache → 得到数据，要求计算命中时间或分析未命中流程。"
+    },
+    {
+      "id": "process-scheduling-heap",
+      "name": "进程调度 + 优先级队列",
+      "subjects": ["os", "ds"],
+      "keywords": ["进程调度", "优先级队列", "堆", "就绪队列", "优先级", "调度算法"],
+      "typicalQuestion": "用堆实现就绪队列，进程切换时如何调整优先级、维护堆结构，分析时间复杂度。"
+    },
+    {
+      "id": "routing-graph-algorithm",
+      "name": "路由协议 + 图算法",
+      "subjects": ["net", "ds"],
+      "keywords": ["OSPF", "RIP", "Dijkstra", "Bellman-Ford", "最短路径", "距离向量", "链路状态", "图算法"],
+      "typicalQuestion": "OSPF 用 Dijkstra 计算最短路径树，RIP 用 Bellman-Ford 更新距离向量，要求分析算法过程或收敛性。"
+    },
+    {
+      "id": "pipeline-dependency-graph",
+      "name": "指令流水线 + 数据依赖图",
+      "subjects": ["co", "ds"],
+      "keywords": ["指令流水线", "数据冒险", "数据依赖", "拓扑排序", "控制冒险", "结构冒险"],
+      "typicalQuestion": "根据指令序列画出数据依赖图，判断流水线冒险类型并给出 forwarding 或阻塞方案。"
+    },
+    {
+      "id": "io-interrupt-dma",
+      "name": "I/O 管理 + 中断 + DMA",
+      "subjects": ["os", "co"],
+      "keywords": ["I/O管理", "中断", "DMA", "设备驱动", "通道", "缓冲", "SPOOLing"],
+      "typicalQuestion": "分析一次磁盘 I/O 中 CPU、中断控制器、DMA 控制器、OS 的协作时序与数据通路。"
+    },
+    {
+      "id": "file-system-bplus-tree",
+      "name": "文件系统 + B+ 树",
+      "subjects": ["os", "ds"],
+      "keywords": ["文件系统", "B+树", "inode", "索引分配", "目录结构", "磁盘块"],
+      "typicalQuestion": "文件系统采用 B+ 树组织目录索引，分析查找、插入、删除时的磁盘 I/O 次数。"
+    }
+  ]
+}
