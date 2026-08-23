@@ -31,13 +31,8 @@ const SUBJECT_MAP = {
   '计算机网络': 'NET',
 };
 
-// 科目章节编号映射（用于从大纲标题推断章节编号）
-const CHAPTER_PREFIX = {
-  'DS': ['线性表', '栈', '树', '图', '查找', '排序'],
-  'CO': ['系统概述', '数据表示', '存储系统', '指令系统', 'CPU', '总线', 'I/O'],
-  'OS': ['OS概述', '进程管理', '内存管理', '文件管理', 'IO管理'],
-  'NET': ['体系结构', '物理层', '数据链路层', '网络层', '传输层', '应用层'],
-};
+// 科目中文序号（生成小节标题 "## 一、数据结构（DS）" 用，与 keyword-index.md 现有格式一致）
+const SUBJECT_ORDINAL = ['一', '二', '三', '四'];
 
 /**
  * 从大纲文件中提取所有术语条目
@@ -60,10 +55,10 @@ function extractTermsFromSyllabus(markdown) {
       continue;
     }
 
-    // 检测章节标题（### N. 章节名）
-    const chapterMatch = line.match(/^###\s+\d+[.、\s]+(.+)$/);
+    // 检测章节标题（### N. 章节名），章节编号与现表格式对齐（如 "1-线性表"）
+    const chapterMatch = line.match(/^###\s+(\d+)[.、\s]+(.+)$/);
     if (chapterMatch && currentSubject) {
-      currentChapter = `${currentSubject}-${chapterMatch[1].trim()}`;
+      currentChapter = `${chapterMatch[1]}-${chapterMatch[2].trim()}`;
       continue;
     }
 
@@ -122,22 +117,27 @@ function formatIndex(terms) {
     }
   }
 
-  // 按科目分组
+  let output = `# 408 术语→科目→章节映射索引（自动生成）\n\n`;
+  output += `> 由 build-keyword-index.js 从考纲大纲自动提取。\n`;
+  output += `> ⚠️ 本文件为生成产物，输出到新文件与手工索引 diff 合并；\n`;
+  output += `> **不要直接覆盖 references/408-keyword-index.md**（其中含手工维护的关联度与跨科映射）。\n\n`;
+
+  // 科目按 大纲顺序（= SUBJECT_MAP 插入顺序）分组，标题对齐手工索引的 "## 一、数据结构（DS）" 格式
   const grouped = {};
+  const subjectOrder = [];
   for (const t of unique) {
-    if (!grouped[t.subject]) grouped[t.subject] = [];
+    if (!grouped[t.subject]) { grouped[t.subject] = []; subjectOrder.push(t.subject); }
     grouped[t.subject].push(t);
   }
 
-  let output = `# 408 术语→科目→章节映射索引（自动生成）\n\n`;
-  output += `> 由 build-keyword-index.js 从考纲大纲自动提取。\n`;
-  output += `> 格式：\`术语 | 科目 | 章节\`\n\n`;
-
-  for (const [subject, items] of Object.entries(grouped)) {
-    output += `---\n\n## ${Object.keys(SUBJECT_MAP).find(k => SUBJECT_MAP[k] === subject) || subject}\n\n`;
-    output += `| 术语 | 章节 |\n|------|------|\n`;
-    for (const t of items) {
-      output += `| ${t.term} | ${t.chapter} |\n`;
+  for (const subject of subjectOrder) {
+    const cnName = Object.keys(SUBJECT_MAP).find(k => SUBJECT_MAP[k] === subject) || subject;
+    const ordinal = SUBJECT_ORDINAL[Object.keys(SUBJECT_MAP).indexOf(cnName)] || '';
+    output += `---\n\n## ${ordinal}、${cnName}（${subject}）\n\n`;
+    // 列结构对齐手工索引（术语|章节|关联度）；自动提取无关联度数据，统一填 ★
+    output += `| 术语 | 章节 | 关联度 |\n|------|------|-------|\n`;
+    for (const t of grouped[subject]) {
+      output += `| ${t.term} | ${t.chapter} | ★ |\n`;
     }
     output += '\n';
   }
@@ -216,17 +216,55 @@ function main() {
     const idx = args.indexOf('--add');
     const entry = args[idx + 1];
     if (!entry) {
-      console.error('用法：--add "术语|科目|章节"');
+      console.error('用法：--add "术语|科目|章节[|关联度]"（科目：ds/co/os/net 或中文名；关联度缺省 ★）');
       process.exit(1);
     }
     const parts = entry.split('|').map(s => s.trim());
-    if (parts.length !== 3) {
-      console.error('格式错误，应为：术语|科目|章节');
+    if (parts.length < 3 || parts.length > 4) {
+      console.error('格式错误，应为：术语|科目|章节[|关联度]');
       process.exit(1);
     }
-    const line = `| ${parts[0]} | ${parts[1]} | ${parts[2]} |\n`;
-    fs.appendFileSync(KEYWORD_PATH, line);
-    console.log(`[OK] 已追加术语：${parts[0]}`);
+    const [term, subjectIn, chapter, relevance] = parts;
+    if (!term || !chapter) {
+      console.error('格式错误：术语与章节不能为空');
+      process.exit(1);
+    }
+    const code = SUBJECT_MAP[subjectIn] || String(subjectIn).toUpperCase();
+    if (!Object.values(SUBJECT_MAP).includes(code)) {
+      console.error(`格式错误：未知科目 "${subjectIn}"（应为 ds/co/os/net 或 数据结构/计算机组成原理/操作系统/计算机网络）`);
+      process.exit(1);
+    }
+    if (!fs.existsSync(KEYWORD_PATH)) {
+      console.error('[ERROR] 关键词索引文件不存在：', KEYWORD_PATH);
+      process.exit(1);
+    }
+
+    // 定位科目小节（"## 一、数据结构（DS）"），把新行插到该小节最后一个表格行之后，
+    // 保持 3 列格式（术语|章节|关联度）与按科目分组的结构；绝不追加到文件末尾
+    // （文件尾部是跨科映射代码块，旧实现会把行插进代码块、且列数错位）
+    const lines = fs.readFileSync(KEYWORD_PATH, 'utf-8').split('\n');
+    const headerRe = /^##\s+/;
+    const sectionRe = new RegExp(`^##\\s+.*（${code}）\\s*$`);
+    let sectionStart = lines.findIndex(l => sectionRe.test(l));
+    if (sectionStart === -1) {
+      console.error(`[ERROR] 索引中未找到 ${code} 科目小节（应形如 "## 一、xx（${code}）"），请检查文件结构`);
+      process.exit(1);
+    }
+    let sectionEnd = lines.length;
+    for (let i = sectionStart + 1; i < lines.length; i++) {
+      if (headerRe.test(lines[i])) { sectionEnd = i; break; }
+    }
+    let insertAt = -1;
+    for (let i = sectionEnd - 1; i > sectionStart; i--) {
+      if (lines[i].startsWith('|') && !/^\|\s*-{2,}/.test(lines[i])) { insertAt = i + 1; break; }
+    }
+    if (insertAt === -1) {
+      console.error(`[ERROR] ${code} 小节内未找到表格行，无法确定插入位置，请手动添加`);
+      process.exit(1);
+    }
+    lines.splice(insertAt, 0, `| ${term} | ${chapter} | ${relevance || '★'} |`);
+    fs.writeFileSync(KEYWORD_PATH, lines.join('\n'), 'utf-8');
+    console.log(`[OK] 已在 ${code} 小节追加术语：${term}（${chapter}）`);
     return;
   }
 
@@ -242,8 +280,9 @@ function main() {
 
   console.log(output);
   console.log(`\n[INFO] 共提取 ${terms.length} 个术语条目（去重前），${new Set(terms.map(t => `${t.term}|${t.subject}|${t.chapter}`)).size} 个去重后条目。`);
-  console.log('[INFO] 如需覆盖 keyword-index.md，运行：');
-  console.log(`  node scripts/build-keyword-index.js > references/408-keyword-index.md`);
+  console.log('[INFO] 如需与现有索引对照合并，输出到**新文件**后 diff（现有索引含手工维护的关联度与跨科映射，勿直接覆盖）：');
+  console.log(`  node scripts/build-keyword-index.js > references/408-keyword-index.generated.md`);
+  console.log(`  git diff --no-index references/408-keyword-index.md references/408-keyword-index.generated.md`);
 }
 
 main();

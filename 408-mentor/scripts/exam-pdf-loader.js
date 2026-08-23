@@ -97,8 +97,13 @@ function extractText(pdfPath, year, type) {
   }
 
   if (fs.existsSync(outputPath)) {
-    console.log(`[SKIP] ${year}-${type} 已提取，跳过`);
-    return outputPath;
+    // 只把"有实质内容"的产物视为已完成；近空文件（如旧版本对扫描件写出的 0 字节 txt）重新提取
+    const existing = fs.readFileSync(outputPath, 'utf-8');
+    if (existing.trim().length >= 50) {
+      console.log(`[SKIP] ${year}-${type} 已提取，跳过`);
+      return outputPath;
+    }
+    console.log(`[WARN] ${year}-${type} 已有文件近乎为空，重新提取`);
   }
 
   console.log(`[EXTRACT] ${year}-${type}：${pdfPath}`);
@@ -123,6 +128,13 @@ function extractText(pdfPath, year, type) {
       if (page && page.text) {
         text += `\n=== 第 ${i + 1} 页 ===\n${page.text}`;
       }
+    }
+
+    // 0 字符几乎必是扫描版 PDF（无文本层）：记为失败且不写文件（写了会永久挡住重提取）
+    if (text.trim().length === 0) {
+      console.error(`[ERROR] ${year}-${type} 提取到 0 字符（PDF 可能为扫描件、无文本层）`);
+      console.error('[HINT] 扫描版 PDF 请走 OCR 路径：python scripts/extract_exam_text.py <pdf路径>');
+      return null;
     }
 
     fs.writeFileSync(outputPath, text, 'utf-8');
@@ -235,14 +247,21 @@ function splitByYear(year) {
     });
   }
 
-  // 去重：\s* 放宽后，正文里行首"数字+点号"（如计算题的 10.某值、二进制 10.xxxx）会被误当题号重复匹配。
-  // 408 题号 1-47 严格唯一，按题号保留首次出现即可剔除正文误切（真题号首次出现总是真的）。
+  // 去重：\s* 放宽后，正文里行首"数字+点号"（如计算题的 10.某值、二进制 10.xxxx、综合题表格数据）会被误当题号重复匹配。
+  // 408 题号 1-47 严格唯一，按题号保留**首次出现**：
+  //   实测 17 年真题文本中，噪声匹配（路由表/小节编号等）总是出现在真题号**之后**，
+  //   且其吞并的长正文反而更长——"保留最长"会误选噪声（2014/2018/2022/2024 实证），故维持保留首次。
+  // 有重复匹配时逐号 warn 提示人工核验；去重后题数 ≠ 47 也会 warn。
   const seen = new Set();
+  const dupNumbers = new Set();
   const deduped = questions.filter(q => {
-    if (seen.has(q.number)) return false;
+    if (seen.has(q.number)) { dupNumbers.add(q.number); return false; }
     seen.add(q.number);
     return true;
   });
+  if (dupNumbers.size > 0) {
+    console.warn(`[WARN] ${year} 年以下题号匹配到多次（已保留首次出现，请核验对应题内容无误切）：${[...dupNumbers].sort((a, b) => a - b).join(', ')}`);
+  }
 
   // 输出分割结果
   const outputPath = path.join(ARCHIVE_DIR, `split-${year}.json`);
