@@ -216,3 +216,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# 408-mentor 用户学习画像（本地数据，勿提交）
+.408-mentor/
+
+# 本地工作文件
+.workbuddy/
+first.zip
