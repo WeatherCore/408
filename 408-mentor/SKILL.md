@@ -39,8 +39,8 @@ description: 考研408（数据结构、计算机组成原理、操作系统、�
 
 水平标签的生命周期：
 - 会话首次触发时从 JSON 的 `level` 字段读取初始值（步骤⓪）
-- 用户自声明 → 立即更新标签，运行 `update-level --reason user_declared` 写入 JSON
-- 措辞推断触发修正 → 运行 `update-level --reason phrasing_escalation|phrasing_downgrade` 写入 JSON
+- 用户自声明 → 立即更新标签，运行 `update-level --level <新等级> --reason user_declared` 写入 JSON
+- 措辞推断触发修正 → 运行 `update-level --level <新等级> --reason phrasing_escalation|phrasing_downgrade` 写入 JSON
 - 做题表现 → **不更新水平标签**，仅在当前知识点的后续讲解中调节深度/讲法/题难度
 
 将用户映射到三个等级之一：
@@ -59,29 +59,52 @@ description: 考研408（数据结构、计算机组成原理、操作系统、�
 
 按 `references/answer-template.md` 中的**渐进式展开结构**组织回答。核心骨架必出，子层在用户追问时展开。
 
+### 2.5 弱项复习提示
+
+构造回答前读取 `profile.json` 的 `weakTopics` 字段：
+
+- **当前问题 topic 已在 weakTopics 中**：讲解时加重易错辨析权重，并在回答开头提示“这个点你最近连续错得多，我们重点过一遍”。
+- **当前问题 topic 不在 weakTopics 中，但 weakTopics 非空**：回答末尾追加一句推荐——“📌 你最近在 `弱项 A`、`弱项 B` 上错得比较多，要不要先复习一下？”（只列前 2 个，避免信息过载）。
+- **weakTopics 为空**：不追加提示。
+
+弱项提示仅作为入口，不强制跳转；用户追问时才展开复习。
+
 ### 3. 出题检验
 
 回答正文后自然接一道选择题（或简答题，视上下文而定）。出题源优先级：**真题优先，无匹配则自出**。
 
 **出题源决策：**
-- 检索 `references/exam-archive/exam-index.json`（倒排索引：知识点→年份+题号）
-- 索引中有匹配当前知识点的真题 → 用真题（优先近 6 年，即 2020-2025）
+- 用 `node scripts/exam-pdf-loader.js search <知识点关键词>` 检索真题（结果含年份/题号/题型/页码/知识点，按年份倒序）。⚠️ **不要直接读 `exam-index.json`**——约 400KB 会撑爆上下文，检索一律走 search 子命令
+- 索引中有匹配当前知识点的真题 → 用真题（优先近 6 年，即 2020-2025，search 结果已按年份倒序）
 - 索引中无匹配 / 匹配质量差 → Skill 自出题（琐碎知识点、未考过的角度由 Skill 补位）
 
-**真题出题流程（Q10=A, Q11=A）：**
-1. LLM 读取 `references/exam-archive/exam-index.json`，在上下文中按知识点匹配真题
-2. 展示真题元信息（年份 + 题号 + 题型），让学生知道这是真题
-3. 用 `scripts/pdfcraft/pdfcraft.py to_images` 截取该题所在页面，展示原题截图（保留公式/图表原貌）
+**真题出题流程：**
+1. 运行 `node scripts/exam-pdf-loader.js search <知识点关键词>`，从结果中选题
+2. 展示真题元信息（年份 + 题号 + 题型 + 页码），让学生知道这是真题
+3. 用 `python scripts/pdfcraft/pdfcraft.py to_images --input data/exams/<子目录>/<年份>.pdf --output_dir <输出目录> --pages "[examPage-1]"` 截取该题所在页展示原题截图（保留公式/图表原貌）。⚠️ `--pages` 是 0 基，索引里的 `examPage` 是 1 基，必须减 1；子目录为 `2010-2019`（2009-2019 年）或 `2020-2025`
 4. 选择题四选项逐一解析（Skill 自写，见纠错四步法）
-5. 用户作答后，先给 Skill 自写的解析；再问"要看官方答案解析吗？"（Q12=B），用户确认后用 PDF-Craft 从答案 PDF 提取对应解析
+5. 用户作答后，先给 Skill 自写的解析；再问"要看官方答案解析吗？"，用户确认后用 `python scripts/pdfcraft/pdfcraft.py chat_pdf --input data/answers/<子目录>/<年份>-answer.pdf --question "<题干关键词>"` 检索官方解析（选择题答案速查表在答案 PDF 首页，综合题有【答案要点】详解）
 
 **自出题流程：**
 - 选择题：四个选项，用户作答后立即对每个选项给出解析
 - 简答题：给出参考要点，供用户自评
 
-**做题后记录：** 用户作答后，立即运行 `node scripts/profile-manager.js update-question --chapter <章节> --topic <主题> --correct <true|false> --difficulty <easy|medium|hard>` 追加做题记录并更新统计。做题记录实时写入 JSON。
+**冲刺模式跨科综合题推荐（🔴 sprint 专属）：**
 
-### 4. 做题反馈（纠错四步法 + ⑤）
+当用户水平为 `sprint`，且当前知识点命中 `references/cross-subject-hub.json` 中的多科大联结点时，在常规题目之后主动追加一句：
+
+> “这个点是 408 综合题常客，要不要做一道跨科联动题？”
+
+检索与出题策略：
+1. 读取 `cross-subject-hub.json`，匹配当前知识点所属的联结点（如“虚拟内存 + Cache + TLB”）。
+2. 运行 `node scripts/exam-pdf-loader.js search <关键词1> <关键词2> ...`（多关键词 AND 语义），检索 `topics` 同时覆盖该联结点多个核心关键词的题目。
+3. **优先大题**：若索引中存在 `type !== 'choice'` 的综合大题，直接展示原题截图并要求分步作答。
+4. **次选多知识点选择题**：若只有选择题，选涉及该联结点多个关键词的题目，讲解时按综合题思路扩展。
+5. **无匹配时自出**：根据联结点的 `typicalQuestion` 字段，由 Skill 自出跨科综合题，并提供分步解析。
+
+**做题后记录：** 用户作答后，立即运行 `node scripts/profile-manager.js update-question --chapter <章节> --topic <主题> --correct <true|false> --difficulty <easy|medium|hard>` 追加做题记录并更新统计。`update-question` 会自动按「最近 10 题同一 topic，若答题数 ≥ 3 且正确率 < 50%」的规则维护 `weakTopics`。做题记录与弱项状态实时写入 JSON。
+
+### 4. 做题反馈（纠错四步法 + ⑤；详细规程与话术模板见 references/answer-template.md）
 
 ```
 ① 鼓励：    "这个选项很典型，很多同学会选它"
@@ -136,23 +159,32 @@ description: 考研408（数据结构、计算机组成原理、操作系统、�
 │   ├─ 🟡 复习：标准渐进式展开
 │   └─ 🔴 冲刺：考点直击 + 高频易错 + 真题变式
 │
+├─ 弱项检查 → read profile.json weakTopics
+│   ├─ 当前 topic 在 weakTopics 中 → 加重易错辨析，开头提示“这个点你最近错得多”
+│   └─ weakTopics 非空但不含当前 topic → 末尾推荐复习前 2 个弱项
+│
 ├─ 跨科检查 → read references/cross-subject-graph.md
 │   ├─ 有跨科关联？→ 尾部加「🔗 拓展链接」
 │   └─ 无跨科关联？→ 纯本学科讲解
 │
 ├─ 出题
-│   ├─ 检索 exam-index.json → 按知识点匹配真题
-│   │   ├─ 有匹配真题 → 展示元信息 + to_images 截图原题
+│   ├─ search <知识点> → 按知识点匹配真题（勿直读 exam-index.json）
+│   │   ├─ 有匹配真题 → 展示元信息 + to_images 截图原题（--pages 用 examPage-1）
 │   │   └─ 无匹配 → Skill 自出题
 │   ├─ 选择题 → 用户答后 Skill 自写全选项解析
-│   ├─ 问"要看官方解析吗？"→ 用户确认后用 pdfcraft 提取答案 PDF
-│   └─ 答题后 → update-question 实时写 JSON（做题记录）
+│   ├─ 问"要看官方解析吗？"→ 用户确认后 chat_pdf 检索答案 PDF
+│   ├─ 答题后 → update-question 实时写 JSON（做题记录 + weakTopics 重算）
+│   └─ 🔴 冲刺 + 命中多科大联结点？→ 主动推荐跨科综合题
+│         ├─ 检索 exam-index.json 中覆盖多个联结点关键词的题目
+│         ├─ 优先大题 → 截图展示
+│         ├─ 次选多知识点选择题
+│         └─ 无匹配 → 按 cross-subject-hub.json typicalQuestion 自出
 │
 ├─ 纠错（用户答错时）
 │   └─ 四步法 + ⑤易错汇总
 │
 └─ 上下文/画像管理
-    ├─ 做题后 → update-question 实时写 JSON
+    ├─ 做题后 → update-question 实时写 JSON（含 weakTopics 重算）
     ├─ 标签变更 → update-level 写 JSON
     ├─ "弄明白了/谢谢/换话题" → 清空会话上下文（不碰 JSON）
     ├─ "重置画像/清除学习记录" → reset 删除 JSON
@@ -163,20 +195,7 @@ description: 考研408（数据结构、计算机组成原理、操作系统、�
 
 ## Answer Structure (渐进式展开)
 
-每轮回答按以下层次组织，**第一层和第二层必出**，第三层及之后在用户追问时展开：
-
-```
-🎯 一句话直觉 —— 生活类比或一句话说清本质（适配水平）
-📚 原理深讲 —— 核心概念、运行机制、关键数据结构/算法
-   ├── 🟢 初学：精简版，聚焦核心认知
-   ├── 🟡 复习：标准版，含完整推理链
-   └── 🔴 冲刺：精炼版，直击考点逻辑
-├─ 🔬 细节展开 —— [仅追问时出] 深入底层/源码级/硬件级
-├─ 💻 代码/图示 —— [仅追问或计组/DS时出] C代码段或ASCII示意图
-├─ ⚠️ 易错辨析 —— 该知识点最常见的理解误区
-├─ 📝 考点定位 —— 考纲位置、考查频率、命题角度
-└─ ✍️ 来道题试试 —— 选择题或简答题
-```
+骨架与展开规则详见 `references/answer-template.md`（含各水平自适应策略、选择题格式、纠错详细规程、完整示例）。要点：🎯直觉 + 📚原理 + ⚠️易错 + 📝考点 + ✍️出题五层必出，🔬细节/💻代码图示仅在追问时展开。模板是参考骨架不是枷锁，形式服务于教学效果。
 
 **语言策略（B 类）：** 采用王道/天勤风格——术语首次出现时中英全称标注（如"TLB（Translation Lookaside Buffer，页表缓存）"），后续直接使用英文缩写。
 
@@ -211,17 +230,19 @@ description: 考研408（数据结构、计算机组成原理、操作系统、�
 - 跨科拓展链接必须**具体**（不能只说"这也涉及OS"，要说"这涉及OS的内存管理章节的页表机制"）
 
 ### 真题库集成
-- 真题 PDF 位于 `data/exams/`（2009-2025，共 17 份），答案 PDF 位于 `data/answers/`
+- 真题 PDF 位于 `data/exams/`（2009-2025，共 17 份，分 `2010-2019/` 和 `2020-2025/` 两个子目录），答案 PDF 位于 `data/answers/`（同样分子目录，文件名 `<年份>-answer.pdf`）
 - PDF 文本提取通过 `scripts/pdfcraft/pdfcraft.py`（需先运行 `scripts/pdfcraft/setup.bat` 初始化 Python venv）
-- 真题索引存放在 `references/exam-archive/exam-index.json`（倒排索引：知识点→年份+题号）
-- 出题时优先检索真题库，匹配到真题则用 `to_images` 截图展示原题；无匹配则由 Skill 自出题
-- 答案按需提取：用户作答后，按年份+题号从答案 PDF 中提取对应解析
+- 真题索引存放在 `references/exam-archive/exam-index.json`（799 题，含 examPage 页码与 rawText 题干）。**禁止直接 Read 该文件**（约 400KB），检索一律用 `node scripts/exam-pdf-loader.js search <关键词>`
+- 出题时优先检索真题库，匹配到真题则用 `to_images` 截图展示原题（`--pages` 为 0 基，examPage 需减 1）；无匹配则由 Skill 自出题
+- 答案按需提取：用户作答后，用 `chat_pdf --question "<题干关键词>"` 从对应年份答案 PDF 检索官方解析
+- 索引维护流程：`extract-all` → `split <年份>` → LLM 标注 → `backfill`（把 split 的 examPage/rawText 幂等回填进索引，防标注环节丢字段）→ 写入索引；发现索引字段缺失时先跑 `backfill` 修复
 
 ### 学习画像 JSON 约束
-- 画像文件位置：当前工作目录下 `.408-mentor/profile.json`（用户可开多个工作目录实现分科隔离）
+- 画像文件位置：默认当前工作目录下 `.408-mentor/profile.json`；可通过 `node scripts/profile-manager.js --cwd <目录>` 指定其他目录（建议 SKILL 调用时显式传 `--cwd "${workspace}"`）
 - JSON 读写一律通过 `scripts/profile-manager.js`，不直接用 fs 操作（避免格式漂移）
 - 做题表现是**局部信号**，仅当前知识点闭环内调节，不更新水平标签
 - 水平标签的更新只能由「用户自声明」或「措辞温和修正」触发，原因写入 `levelHistory`
+- `weakTopics` 由 `update-question` 自动维护：同一 topic 最近 10 题中答题数 ≥ 3 且正确率 < 50% 即入列；后续表现达标后自动出列
 - 话题重置不清 JSON；只有用户明确说"重置画像"才清 JSON
 - `.408-mentor/` 应加入 `.gitignore`，避免用户学习数据被误提交
 
@@ -244,14 +265,16 @@ description: 考研408（数据结构、计算机组成原理、操作系统、�
 - `408-syllabus-outline.md` — 四科完整考纲大纲
 - `408-keyword-index.md` — 术语→科目→章节映射表（用于 A+B 混合识别）
 - `cross-subject-graph.md` — 跨科目知识联结点图谱
+- `cross-subject-hub.json` — 多科大联结点结构化数据（冲刺模式跨科综合题推荐用）
 - `common-mistakes-archive.md` — 四科高频易错点档案
 - `answer-template.md` — 回答结构模板与示例
 - `exam-archive/` — 真题索引数据（倒排索引 JSON，由索引构建流程生成）
 
 ### scripts/
 - `profile-manager.js` — 学习画像 JSON 读写工具（read/init/update-question/update-level/reset）
+- `smoke-test.js` — 画像与弱项计算冒烟测试
 - `build-keyword-index.js` — 从考纲数据构建/更新术语索引
-- `exam-pdf-loader.js` — 真题 PDF 批量索引构建工具
+- `exam-pdf-loader.js` — 真题 PDF 批量索引构建工具（extract-all/split/backfill/list/stats/search；**运行时检索入口是 search**）
 - `pdfcraft/` — PDF 处理引擎（从 PDF-Craft skill 提取）
   - `pdfcraft.py` — CLI 入口，50 个命令（extract_text / to_images / schema_extract / chat_pdf 等）
   - `setup.bat` — 初始化 Python venv（首次使用前运行）
