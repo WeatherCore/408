@@ -6,18 +6,15 @@
  * 408-mentor 学习画像 JSON 的底层读写工具。
  * 负责格式与原子性，不负责教学决策（决策由 SKILL.md 描述，LLM 调用本脚本）。
  *
- * 数据位置：当前工作目录下 .408-mentor/profile.json
- * 设计依据：Q5 选 C，用户可开多个工作目录天然分科隔离画像。
+ * 数据位置：默认当前工作目录下 .408-mentor/profile.json
+ * 可通过 --cwd <目录> 指定其他工作目录。
  *
  * 用法：
- *   node scripts/profile-manager.js read                          # 读取画像（不存在则返回 null）
- *   node scripts/profile-manager.js init --subject <ds|co|os|net> --level <beginner|review|sprint>
- *                                                                 # 初始化空画像
- *   node scripts/profile-manager.js update-question --chapter <章节> --topic <主题> --correct <true|false> --difficulty <easy|medium|hard>
- *                                                                 # 追加一条做题记录并更新统计
- *   node scripts/profile-manager.js update-level --level <beginner|review|sprint> --reason <user_declared|phrasing_escalation|phrasing_downgrade>
- *                                                                 # 更新水平标签（写审计轨迹）
- *   node scripts/profile-manager.js reset                         # 清空画像（删除文件）
+ *   node scripts/profile-manager.js [--cwd <目录>] read
+ *   node scripts/profile-manager.js [--cwd <目录>] init --subject <ds|co|os|net> --level <beginner|review|sprint>
+ *   node scripts/profile-manager.js [--cwd <目录>] update-question --chapter <章节> --topic <主题> --correct <true|false> --difficulty <easy|medium|hard>
+ *   node scripts/profile-manager.js [--cwd <目录>] update-level --level <beginner|review|sprint> --reason <user_declared|phrasing_escalation|phrasing_downgrade>
+ *   node scripts/profile-manager.js [--cwd <目录>] reset
  *
  * 输出：所有命令以 JSON 打印到 stdout，便于 LLM 解析。
  *      错误信息打印到 stderr，退出码非 0。
@@ -25,9 +22,6 @@
 
 const fs = require('fs');
 const path = require('path');
-
-const PROFILE_DIR = path.join(process.cwd(), '.408-mentor');
-const PROFILE_PATH = path.join(PROFILE_DIR, 'profile.json');
 
 const VALID_LEVELS = new Set(['beginner', 'review', 'sprint']);
 const VALID_SUBJECTS = new Set(['ds', 'co', 'os', 'net']);
@@ -39,6 +33,40 @@ const VALID_REASONS = new Set([
 ]);
 
 const SCHEMA_VERSION = '1';
+
+// 弱项计算参数：最近 WINDOW 条该 topic 记录中，若答题数 >= MIN_ATTEMPTS 且正确率 < 50%，则标记为弱项
+const WEAK_TOPIC_WINDOW_SIZE = 10;
+const WEAK_TOPIC_MIN_ATTEMPTS = 3;
+const WEAK_TOPIC_THRESHOLD = 0.5;
+
+let PROFILE_DIR = path.join(process.cwd(), '.408-mentor');
+let PROFILE_PATH = path.join(PROFILE_DIR, 'profile.json');
+
+/**
+ * 根据 cwd 解析画像路径。未指定时使用 process.cwd()。
+ */
+function resolveProfilePaths(cwd) {
+  const base = cwd ? path.resolve(cwd) : process.cwd();
+  PROFILE_DIR = path.join(base, '.408-mentor');
+  PROFILE_PATH = path.join(PROFILE_DIR, 'profile.json');
+}
+
+/**
+ * 从章节名推断科目。支持 "OS-内存管理"、"CO-存储系统" 等显式前缀，
+ * 也支持常见章节关键词兜底。
+ */
+function inferSubjectFromChapter(chapter) {
+  if (!chapter || typeof chapter !== 'string') return 'unknown';
+  const prefix = chapter.split('-')[0].toLowerCase();
+  if (VALID_SUBJECTS.has(prefix)) return prefix;
+
+  const lower = chapter.toLowerCase();
+  if (lower.includes('数据') || lower.includes('图') || lower.includes('树') || lower.includes('排序') || lower.includes('查找')) return 'ds';
+  if (lower.includes('组成') || lower.includes('cache') || lower.includes('tlb') || lower.includes('流水线') || lower.includes('指令') || lower.includes('alu') || lower.includes('浮点')) return 'co';
+  if (lower.includes('操作') || lower.includes('进程') || lower.includes('内存') || lower.includes('文件') || lower.includes('io') || lower.includes('pv') || lower.includes('死锁')) return 'os';
+  if (lower.includes('网络') || lower.includes('tcp') || lower.includes('ip') || lower.includes('路由') || lower.includes('协议') || lower.includes('http') || lower.includes('dns')) return 'net';
+  return 'unknown';
+}
 
 /**
  * 读取画像。文件不存在返回 null（不报错）。
@@ -110,7 +138,56 @@ function writeProfile(profile) {
 }
 
 /**
- * 追加一条做题记录，并同步更新统计。
+ * 根据 questionLog 重新计算 weakTopics。
+ * 规则：对每个 topic，取最近 WINDOW 条记录；若 total >= MIN_ATTEMPTS 且 correctRate < 0.5，则视为弱项。
+ * 已不再是弱项的 topic 会被移除。
+ */
+function recalculateWeakTopics(profile) {
+  const log = profile.questionLog || [];
+  const byTopic = {};
+
+  for (const entry of log) {
+    const t = entry.topic;
+    if (!t) continue;
+    if (!byTopic[t]) byTopic[t] = [];
+    byTopic[t].push(entry);
+  }
+
+  const nextWeak = [];
+  const now = new Date().toISOString();
+
+  for (const topic of Object.keys(byTopic)) {
+    const recent = byTopic[topic]
+      .slice(-WEAK_TOPIC_WINDOW_SIZE)
+      .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    const total = recent.length;
+    const correct = recent.filter((e) => e.correct).length;
+    const rate = total > 0 ? correct / total : 0;
+
+    if (total >= WEAK_TOPIC_MIN_ATTEMPTS && rate < WEAK_TOPIC_THRESHOLD) {
+      const chapter = recent[recent.length - 1].chapter || 'unknown';
+      const existing = (profile.weakTopics || []).find((w) => w.topic === topic);
+      nextWeak.push({
+        topic,
+        chapter,
+        subject: inferSubjectFromChapter(chapter),
+        wrongCount: total - correct,
+        totalCount: total,
+        correctRate: Number(rate.toFixed(2)),
+        firstWeakAt: existing ? existing.firstWeakAt : now,
+        latestWeakAt: now,
+      });
+    }
+  }
+
+  // 保留顺序：按 latestWeakAt 倒序，最新的弱项在前
+  profile.weakTopics = nextWeak.sort(
+    (a, b) => new Date(b.latestWeakAt) - new Date(a.latestWeakAt)
+  );
+}
+
+/**
+ * 追加一条做题记录，并同步更新统计与弱项。
  */
 function updateQuestion(chapter, topic, correct, difficulty) {
   const profile = readProfile();
@@ -148,6 +225,7 @@ function updateQuestion(chapter, topic, correct, difficulty) {
     profile.stats.byChapter[chapter] = { total: 1, correct: isCorrect ? 1 : 0 };
   }
 
+  recalculateWeakTopics(profile);
   writeProfile(profile);
   return profile;
 }
@@ -196,6 +274,7 @@ function resetProfile() {
 
 /**
  * 解析 --flag value 参数对。
+ * 注意：--cwd 会在 main 中提前提取，不会出现在返回结果中。
  */
 function parseFlags(args) {
   const flags = {};
@@ -214,10 +293,30 @@ function parseFlags(args) {
   return flags;
 }
 
+/**
+ * 从 argv 中提取全局 --cwd（如果存在），并返回剩余参数。
+ */
+function extractCwd(args) {
+  const rest = [];
+  let cwd = null;
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--cwd') {
+      cwd = args[i + 1];
+      i++;
+    } else {
+      rest.push(args[i]);
+    }
+  }
+  return { cwd, rest };
+}
+
 function main() {
-  const args = process.argv.slice(2);
-  const command = args[0];
-  const rest = args.slice(1);
+  const rawArgs = process.argv.slice(2);
+  const { cwd, rest } = extractCwd(rawArgs);
+  resolveProfilePaths(cwd);
+
+  const command = rest[0];
+  const flags = parseFlags(rest.slice(1));
 
   switch (command) {
     case 'read': {
@@ -226,32 +325,29 @@ function main() {
       break;
     }
     case 'init': {
-      const f = parseFlags(rest);
-      if (!f.subject || !f.level) {
+      if (!flags.subject || !flags.level) {
         console.error('用法：init --subject <ds|co|os|net> --level <beginner|review|sprint>');
         process.exit(1);
       }
-      const p = initProfile(f.subject, f.level);
+      const p = initProfile(flags.subject, flags.level);
       console.log(JSON.stringify({ ok: true, action: 'init', path: PROFILE_PATH, profile: p }, null, 2));
       break;
     }
     case 'update-question': {
-      const f = parseFlags(rest);
-      if (!f.chapter || !f.topic || f.correct === undefined || !f.difficulty) {
+      if (!flags.chapter || !flags.topic || flags.correct === undefined || !flags.difficulty) {
         console.error('用法：update-question --chapter <章节> --topic <主题> --correct <true|false> --difficulty <easy|medium|hard>');
         process.exit(1);
       }
-      const p = updateQuestion(f.chapter, f.topic, f.correct, f.difficulty);
-      console.log(JSON.stringify({ ok: true, action: 'update-question', stats: p.stats }, null, 2));
+      const p = updateQuestion(flags.chapter, flags.topic, flags.correct, flags.difficulty);
+      console.log(JSON.stringify({ ok: true, action: 'update-question', stats: p.stats, weakTopics: p.weakTopics }, null, 2));
       break;
     }
     case 'update-level': {
-      const f = parseFlags(rest);
-      if (!f.level || !f.reason) {
+      if (!flags.level || !flags.reason) {
         console.error('用法：update-level --level <beginner|review|sprint> --reason <user_declared|phrasing_escalation|phrasing_downgrade>');
         process.exit(1);
       }
-      const p = updateLevel(f.level, f.reason);
+      const p = updateLevel(flags.level, flags.reason);
       console.log(JSON.stringify({ ok: true, action: 'update-level', level: p.level, levelHistory: p.levelHistory }, null, 2));
       break;
     }
@@ -263,11 +359,11 @@ function main() {
     default:
       console.error(`未知命令：${command || '(空)'}\n`);
       console.error('用法：');
-      console.error('  read');
-      console.error('  init --subject <ds|co|os|net> --level <beginner|review|sprint>');
-      console.error('  update-question --chapter <章节> --topic <主题> --correct <true|false> --difficulty <easy|medium|hard>');
-      console.error('  update-level --level <beginner|review|sprint> --reason <user_declared|phrasing_escalation|phrasing_downgrade>');
-      console.error('  reset');
+      console.error('  [--cwd <目录>] read');
+      console.error('  [--cwd <目录>] init --subject <ds|co|os|net> --level <beginner|review|sprint>');
+      console.error('  [--cwd <目录>] update-question --chapter <章节> --topic <主题> --correct <true|false> --difficulty <easy|medium|hard>');
+      console.error('  [--cwd <目录>] update-level --level <beginner|review|sprint> --reason <user_declared|phrasing_escalation|phrasing_downgrade>');
+      console.error('  [--cwd <目录>] reset');
       process.exit(1);
   }
 }
