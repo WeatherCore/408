@@ -83,7 +83,7 @@ description: 考研408（数据结构、计算机组成原理、操作系统、�
 2. 展示真题元信息（年份 + 题号 + 题型 + 页码），让学生知道这是真题
 3. 用 `python scripts/pdfcraft/pdfcraft.py to_images --input data/exams/<子目录>/<年份>.pdf --output_dir <输出目录> --pages "[examPage-1]"` 截取该题所在页展示原题截图（保留公式/图表原貌）。⚠️ `--pages` 是 0 基，索引里的 `examPage` 是 1 基，必须减 1；子目录为 `2010-2019`（2009-2019 年）或 `2020-2025`
 4. 选择题四选项逐一解析（Skill 自写，见纠错四步法）
-5. 用户作答后，先给 Skill 自写的解析；再问"要看官方答案解析吗？"，用户确认后用 `python scripts/pdfcraft/pdfcraft.py chat_pdf --input data/answers/<子目录>/<年份>-answer.pdf --question "<题干关键词>"` 检索官方解析（选择题答案速查表在答案 PDF 首页，综合题有【答案要点】详解）
+5. 用户作答后，先给 Skill 自写的解析；再问"要看官方答案解析吗？"，用户确认后用 `python scripts/pdfcraft/pdfcraft.py chat_pdf --input data/answers/<子目录>/<年份>-answer.pdf --question "<题干关键词>" --text_fallback references/exam-archive/extracted-text/<年份>-answer.txt` 检索官方解析（选择题答案速查表在答案 PDF 首页，综合题有【答案要点】详解）。`--text_fallback` 指向 OCR 文本：2019/2021/2024/2025 的答案 PDF 是扫描件（无文本层），不带此参数会直接报错；其余年份该参数不生效（PDF 有文本层时优先用 PDF），因此**每次检索都带上它即可**
 
 **自出题流程：**
 - 选择题：四个选项，用户作答后立即对每个选项给出解析
@@ -231,11 +231,11 @@ description: 考研408（数据结构、计算机组成原理、操作系统、�
 
 ### 真题库集成
 - 真题 PDF 位于 `data/exams/`（2009-2025，共 17 份，分 `2010-2019/` 和 `2020-2025/` 两个子目录），答案 PDF 位于 `data/answers/`（同样分子目录，文件名 `<年份>-answer.pdf`）
-- PDF 文本提取通过 `scripts/pdfcraft/pdfcraft.py`（需先运行 `scripts/pdfcraft/setup.bat` 初始化 Python venv）
+- PDF 文本提取通过 `scripts/pdfcraft/pdfcraft.py`（需先运行 `scripts/pdfcraft/setup.bat` 初始化 Python venv）；**扫描版 PDF（无文本层，如 2019/2021/2024/2025 的答案）用 `python scripts/extract_exam_text.py --all` 提取**（PyMuPDF 直提 + OCR 回退，输出同样落入 extracted-text/）
 - 真题索引存放在 `references/exam-archive/exam-index.json`（799 题，含 examPage 页码与 rawText 题干）。**禁止直接 Read 该文件**（约 400KB），检索一律用 `node scripts/exam-pdf-loader.js search <关键词>`
 - 出题时优先检索真题库，匹配到真题则用 `to_images` 截图展示原题（`--pages` 为 0 基，examPage 需减 1）；无匹配则由 Skill 自出题
-- 答案按需提取：用户作答后，用 `chat_pdf --question "<题干关键词>"` 从对应年份答案 PDF 检索官方解析
-- 索引维护流程：`extract-all` → `split <年份>` → LLM 标注 → `backfill`（把 split 的 examPage/rawText 幂等回填进索引，防标注环节丢字段）→ 写入索引；发现索引字段缺失时先跑 `backfill` 修复
+- 答案按需提取：用户作答后，用 `chat_pdf --question "<题干关键词>" --text_fallback references/exam-archive/extracted-text/<年份>-answer.txt` 从对应年份答案 PDF 检索官方解析（扫描版年份靠 fallback 文本，其余年份直读 PDF）
+- 索引维护流程：`extract-all` → `split <年份>` → LLM 标注 → `backfill`（把 split 的 examPage/rawText 幂等回填进索引，防标注环节丢字段）→ 写入索引；发现索引字段缺失时先跑 `backfill` 修复。`extract-all` 遇无文本层的扫描版 PDF 会报错并提示改走 `python scripts/extract_exam_text.py`（OCR 路径）
 
 ### 学习画像 JSON 约束
 - 画像文件位置：默认当前工作目录下 `.408-mentor/profile.json`；可通过 `node scripts/profile-manager.js --cwd <目录>` 指定其他目录（建议 SKILL 调用时显式传 `--cwd "${workspace}"`）
@@ -276,7 +276,7 @@ description: 考研408（数据结构、计算机组成原理、操作系统、�
 - `build-keyword-index.js` — 从考纲数据构建/更新术语索引
 - `exam-pdf-loader.js` — 真题 PDF 批量索引构建工具（extract-all/split/backfill/list/stats/search；**运行时检索入口是 search**）
 - `pdfcraft/` — PDF 处理引擎（从 PDF-Craft skill 提取）
-  - `pdfcraft.py` — CLI 入口，50 个命令（extract_text / to_images / schema_extract / chat_pdf 等）
+  - `pdfcraft.py` — CLI 入口，49 个命令（extract_text / to_images / schema_extract / chat_pdf 等）
   - `setup.bat` — 初始化 Python venv（首次使用前运行）
 
 ### data/

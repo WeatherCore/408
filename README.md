@@ -380,7 +380,7 @@ Skill 会自动识别问题属于哪个科目。想手动限定视角时，在�
 │   │   ├── exam-pdf-loader.js         ← 真题批量索引构建（extract-all/split/list/stats/search）
 │   │   ├── extract_exam_text.py       ← 真题文本提取（PyMuPDF 直提 + OCR fallback）
 │   │   └── pdfcraft/                  ← PDF 处理引擎（从 PDF-Craft 提取）
-│   │       ├── pdfcraft.py            ← CLI 入口，50 个命令
+│   │       ├── pdfcraft.py            ← CLI 入口，49 个命令
 │   │       ├── pdfkit/                ← 内置命令包
 │   │       └── setup.bat              ← 初始化 Python venv（首次使用前运行）
 │   │
