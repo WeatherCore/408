@@ -123,7 +123,9 @@ if "!INSTALL_ALL!"=="1" (
 REM --- 3.2 Download bundled font ---
 set "FONT_DIR=!SCRIPTS_DIR!\..\fonts"
 set "FONT_FILE=!FONT_DIR!\NotoSansSC-Regular.ttf"
-set "FONT_URL=https://docs.gtimg.com/tdocs-font-source/test/NotoSansSC-Regular.ttf"
+REM Noto Sans SC official source: variable-weight TTF from Google Fonts repo (default instance = Regular).
+REM Legacy URL docs.gtimg.com/tdocs-font-source/test/ was a 3rd-party CDN test path, deprecated.
+set "FONT_URL=https://github.com/google/fonts/raw/main/ofl/notosanssc/NotoSansSC%%5Bwght%%5D.ttf"
 
 if exist "!FONT_FILE!" (
     echo [OK] Bundled font already exists
@@ -133,7 +135,14 @@ if exist "!FONT_FILE!" (
     if not exist "!FONT_DIR!" mkdir "!FONT_DIR!"
     powershell -NoProfile -ExecutionPolicy Bypass -Command "$ProgressPreference='SilentlyContinue'; [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; try { Invoke-WebRequest -Uri '!FONT_URL!' -OutFile '!FONT_FILE!' -UseBasicParsing } catch { Write-Host $_.Exception.Message; exit 1 }"
     if exist "!FONT_FILE!" (
-        echo [OK] Bundled font downloaded
+        REM Integrity check: TTF magic 00 01 00 00 + min size, rejects CDN error pages / truncated files
+        powershell -NoProfile -Command "$b=[IO.File]::ReadAllBytes('!FONT_FILE!'); $ok=$b.Length -ge 500000 -and $b[0] -eq 0 -and $b[1] -eq 1; exit [int](-not $ok)"
+        if !errorlevel! EQU 0 (
+            echo [OK] Bundled font downloaded
+        ) else (
+            echo [--] Font file failed validation, discarded (non-fatal, will use system fonts^)
+            del "!FONT_FILE!" >nul 2>nul
+        )
     ) else (
         echo [--] Font download failed (non-fatal, will use system fonts^)
     )
@@ -217,6 +226,15 @@ echo   Downloading...
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$ProgressPreference='SilentlyContinue'; [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; try { Invoke-WebRequest -Uri '!DL_URL!' -OutFile '!DL_TMP!' -UseBasicParsing } catch { Write-Host $_.Exception.Message; exit 1 }"
 if !errorlevel! NEQ 0 (
     echo [ERROR] Download failed
+    del "!DL_TMP!" 2>nul
+    exit /b 1
+)
+
+echo   Verifying download...
+REM gzip magic check (1f 8b): rejects error pages / truncated files masquerading as archives
+powershell -NoProfile -Command "$b=[IO.File]::ReadAllBytes('!DL_TMP!'); $ok=$b.Length -gt 0 -and $b[0] -eq 0x1f -and $b[1] -eq 0x8b; exit [int](-not $ok)"
+if !errorlevel! NEQ 0 (
+    echo [ERROR] Downloaded file is not a valid gzip archive (possibly an error page^)
     del "!DL_TMP!" 2>nul
     exit /b 1
 )

@@ -96,6 +96,14 @@ _download_python() {
         return 1
     fi
 
+    # gzip 魔数校验（1f 8b）：挡住把错误页/截断文件当压缩包解压
+    if [ "$(head -c 2 "$TMP_TAR" | od -An -tx1 | tr -d ' 
+')" != "1f8b" ]; then
+        echo -e "${RED}✗ Downloaded file is not a valid gzip archive (possibly an error page)${NC}"
+        rm -f "$TMP_TAR"
+        return 1
+    fi
+
     # python-build-standalone 解压后目录为 python/
     tar -xzf "$TMP_TAR" -C "$LOCAL_PYTHON_DIR" --strip-components=1
     rm -f "$TMP_TAR"
@@ -177,7 +185,9 @@ fi
 # ── 3.2 下载内置字体 ─────────────────────────────────────────
 FONT_DIR="$SCRIPTS_DIR/../fonts"
 FONT_FILE="$FONT_DIR/NotoSansSC-Regular.ttf"
-FONT_URL="https://docs.gtimg.com/tdocs-font-source/test/NotoSansSC-Regular.ttf"
+# Noto Sans SC 官方发布源（Google Fonts 仓库的可变字重 TTF，默认实例即 Regular；
+# 旧地址 docs.gtimg.com/tdocs-font-source/test/ 是第三方 CDN 的测试路径，已弃用）
+FONT_URL="https://github.com/google/fonts/raw/main/ofl/notosanssc/NotoSansSC%5Bwght%5D.ttf"
 
 if [ -f "$FONT_FILE" ]; then
     echo -e "${GREEN}✓${NC} Bundled font already exists"
@@ -195,11 +205,13 @@ else
             _font_ok=true
         fi
     fi
-    if [ "$_font_ok" = true ] && [ -f "$FONT_FILE" ]; then
+    # 完整性校验：TTF 魔数 00 01 00 00 + 最小体积，挡住 CDN 错误页/截断文件被当字体用
+    if [ "$_font_ok" = true ] && [ -f "$FONT_FILE" ]         && [ "$(wc -c <"$FONT_FILE" | tr -d ' ')" -ge 500000 ]         && [ "$(head -c 2 "$FONT_FILE" | od -An -tx1 | tr -d ' 
+')" = "0001" ]; then
         echo -e "${GREEN}✓${NC} Bundled font downloaded"
     else
         rm -f "$FONT_FILE"
-        echo -e "${YELLOW}△${NC} Font download failed (non-fatal, will use system fonts)"
+        echo -e "${YELLOW}△${NC} Font download failed or failed validation (non-fatal, will use system fonts)"
     fi
 fi
 

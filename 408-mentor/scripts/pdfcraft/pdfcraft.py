@@ -29,17 +29,42 @@ if _SCRIPT_DIR not in sys.path:
 # macOS/Linux: venv/lib/pythonX.Y/site-packages
 _VENV_DIR = os.path.join(_SCRIPT_DIR, "venv")
 if os.path.isdir(_VENV_DIR):
-    # Windows 结构: venv/Lib/site-packages
-    _sp_win = os.path.join(_VENV_DIR, "Lib", "site-packages")
-    if os.path.isdir(_sp_win) and _sp_win not in sys.path:
-        sys.path.insert(0, _sp_win)
-    # macOS/Linux 结构: venv/lib/pythonX.Y/site-packages
-    _venv_lib = os.path.join(_VENV_DIR, "lib")
-    if os.path.isdir(_venv_lib):
-        for _d in os.listdir(_venv_lib):
-            _sp = os.path.join(_venv_lib, _d, "site-packages")
-            if os.path.isdir(_sp) and _sp not in sys.path:
-                sys.path.insert(0, _sp)
+    # 版本守卫：venv 的 site-packages 只能被同版本解释器加载（编译扩展 ABI 不兼容），
+    # pyvenv.cfg 记录了建 venv 时的 Python 版本；不匹配时警告并跳过注入
+    # （回退用当前解释器自己的包），避免混合解释器导致 "DLL 加载失败/找不到模块" 类崩溃。
+    _venv_version = None
+    _pyvenv_cfg = os.path.join(_VENV_DIR, "pyvenv.cfg")
+    if os.path.isfile(_pyvenv_cfg):
+        try:
+            with open(_pyvenv_cfg, "r", encoding="utf-8", errors="ignore") as f:
+                for _line in f:
+                    if _line.startswith("version"):
+                        _venv_version = _line.split("=", 1)[1].strip()
+                        break
+        except OSError:
+            pass
+    _running_version = f"{sys.version_info.major}.{sys.version_info.minor}"
+    if _venv_version and not _venv_version.startswith(_running_version):
+        _venv_python = os.path.join(_VENV_DIR, "Scripts", "python.exe")
+        if not os.path.isfile(_venv_python):
+            _venv_python = os.path.join(_VENV_DIR, "bin", "python")
+        print(
+            f"[WARN] venv 是 Python {_venv_version}，与当前解释器 {_running_version} 不一致，"
+            f"跳过 venv 依赖注入；请用 {_venv_python} 运行，或删除 venv 后重跑 setup 重建",
+            file=sys.stderr,
+        )
+    else:
+        # Windows 结构: venv/Lib/site-packages
+        _sp_win = os.path.join(_VENV_DIR, "Lib", "site-packages")
+        if os.path.isdir(_sp_win) and _sp_win not in sys.path:
+            sys.path.insert(0, _sp_win)
+        # macOS/Linux 结构: venv/lib/pythonX.Y/site-packages
+        _venv_lib = os.path.join(_VENV_DIR, "lib")
+        if os.path.isdir(_venv_lib):
+            for _d in os.listdir(_venv_lib):
+                _sp = os.path.join(_venv_lib, _d, "site-packages")
+                if os.path.isdir(_sp) and _sp not in sys.path:
+                    sys.path.insert(0, _sp)
 
 
 def _get_extension_dir():

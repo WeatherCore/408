@@ -220,6 +220,9 @@ __marimo__/
 # 408-mentor 用户学习画像（本地数据，勿提交）
 .408-mentor/
 
+# 408-mentor: setup 下载的内置字体（约 17MB 二进制运行时资产）
+408-mentor/scripts/fonts/
+
 # 本地工作文件
 .workbuddy/
 first.zip
