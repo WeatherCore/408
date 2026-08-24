@@ -2,15 +2,17 @@
 
 # 🎓 408-mentor
 
-**不是题库，不是搜题器——是一位记得住你、看得懂你、陪你把 408 啃下来的良师。**
+**一个把 17 年真题装进教案的考研 408 AI 良师 Skill——讲原理、辨易错、出真题、追弱项**
 
 *An AI mentor for China's CS postgraduate entrance exam (408) — adaptive, persistent, cross-subject.*
 
-[![Skill](https://img.shields.io/badge/Skill-408--mentor-D4AF37?style=flat-square)](./408-mentor/SKILL.md)
+
+[![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933?style=flat-square&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
+[![真题库](https://img.shields.io/badge/%E7%9C%9F%E9%A2%98-2009~2025%20%C2%B7%20799%20%E9%A2%98-D4AF37?style=flat-square)](408-mentor/references/exam-archive/exam-index.json)
 [![Subjects](https://img.shields.io/badge/Subjects-DS%20%7C%20CO%20%7C%20OS%20%7C%20NET-3776AB?style=flat-square)](./408-mentor/references/408-syllabus-outline.md)
-[![ExamBank](https://img.shields.io/badge/ExamBank-791%20Questions%20Indexed-D4AF37?style=flat-square)](./408-mentor/references/exam-archive/exam-index.json)
-[![Node](https://img.shields.io/badge/Node.js-18+-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org/)
-[![License](https://img.shields.io/badge/License-MIT-D4AF37?style=flat-square)](./LICENSE)
+[![Agent Skill](https://img.shields.io/badge/Agent%20Skill-SKILL.md-7C4DFF?style=flat-square)](408-mentor/SKILL.md)
+[![License](https://img.shields.io/badge/License-MIT-1f6feb?style=flat-square)](./LICENSE)
 
 [快速开始](#-快速开始) · [设计哲学](#-设计哲学良师不是搜索引擎) · [核心机制](#-核心机制) · [项目结构](#-项目结构) · [技术亮点](#-技术亮点)
 
@@ -31,6 +33,12 @@
 
 > 💡 它做良师，不做搜题器。它讲的是"为什么这样、怎么考、坑在哪"，而不是"选 C 因为 ABCD"。
 
+---
+## 🧭 三大支柱
+
+|                                                                                         📜 真题驱动                                                                                         |                                                                       🎚️ 因材施教                                                                       |                                                                         🔗 跨科联结                                                                         |
+| :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: | :----------------------------------------------------------------------------------------------------------------------------------------------------: | :--------------------------------------------------------------------------------------------------------------------------------------------------------: |
+| 2009–2025 共 17 年真题+答案 PDF 全量入库，构建 **799 题倒排索引**（年份/题号/题型/科目/知识点/页码/题干原文）。出题真题优先，原题以**截图**呈现保留公式图表，官方解析按需从答案 PDF 提取。 | **三信号分层**判定水平（初学/复习/冲刺），回答结构、易错数量、出题难度随水平自适应；做题记录沉淀为跨会话画像，**弱项自动追踪**并在后续回答中主动提醒。 | 术语索引解决跨科歧义（TLB 到底是 OS 还是计组的？），跨科图谱在讲完主科后给出具体到章节的拓展链接；冲刺模式识别**六大跨科综合题高发联结点**并主动出综合题。 |
 ---
 
 ## 🧭 设计哲学：良师不是搜索引擎
@@ -107,7 +115,7 @@ flowchart LR
 | `levelHistory` | 水平变更审计轨迹，记录每次变更原因 |
 | `stats` | 做题统计，按章节聚合正确率 |
 | `questionLog` | 做题明细日志 |
-| `weakTopics` | **预留字段**——未来自动识别薄弱知识点 |
+| `weakTopics` | **自动维护**——`update-question` 按最近做题表现动态识别薄弱 topic（入列/出列全自动） |
 
 ### 4. 跨科知识联动
 
@@ -141,7 +149,7 @@ flowchart LR
 
 ### 6. 真题优先出题闭环
 
-出题源不是"随便编一道"，而是**真题优先，无匹配则自出**。17 年真题（2009-2025）已预构建为倒排索引：791 道题、1967 个知识点词条，每条含年份、题号、题型、科目、章节、知识点标签与原文页码。
+出题源不是"随便编一道"，而是**真题优先，无匹配则自出**。17 年真题（2009-2025）已预构建为倒排索引：799 道题、2020 个知识点词条，每条含年份、题号、题型、科目、章节、知识点标签与原文页码。
 
 ```mermaid
 flowchart TB
@@ -163,6 +171,19 @@ flowchart TB
 - **优先近 6 年**（2020-2025）：命题风格更接近当前考试，老题作补位
 - **截图出题而非重排文字**：真题里的公式、图表、电路符号用 `to_images` 截图呈现原貌，避免转写失真
 - **官方解析按需提取**：先让学生看 Skill 自写的教学化解析，想看官方原文时再从答案 PDF 懒提取——不预先灌满上下文
+
+<details>
+<summary><b>📄 官方解析提取命令（点击展开）</b></summary>
+
+用户作答并确认想看官方解析后运行（`--text_fallback` 每次都带上——2019/2021/2024/2025 的答案 PDF 是扫描件无文本层，缺参会直接报错；有文本层的年份该参数自动不生效）：
+
+```
+python scripts/pdfcraft/pdfcraft.py chat_pdf --input data/answers/<2010-2019|2020-2025>/<年份>-answer.pdf --question "<题干关键词>" --text_fallback references/exam-archive/extracted-text/<年份>-answer.txt
+```
+
+选择题答案速查表在答案 PDF 首页，综合题有【答案要点】详解。
+
+</details>
 
 ### 7. 索引一次构建，运行时只读
 
@@ -191,7 +212,7 @@ flowchart TB
     end
 
     subgraph 真题层
-        EI[exam-index.json<br/>倒排索引 791 题 / 1967 词条]
+        EI[exam-index.json<br/>倒排索引 799 题 / 2020 词条]
         PC[pdfcraft 引擎<br/>to_images 截图 / 答案提取]
         DP[data/exams + data/answers<br/>17 年真题与答案 PDF]
     end
@@ -218,16 +239,17 @@ flowchart TB
 
 ## ✨ 功能全景
 
-- 🎯 **渐进式答疑** — 一句话直觉 → 原理深讲 → 易错辨析 → 考点定位 → 出题检验，核心骨架必出、细节层追问才出
-- 🧬 **三信号自适应** — 自声明设标签 / 措辞做温和修正 / 做题表现做即时教学调节，各司其职不过度承诺
-- 💾 **跨会话画像** — 水平标签 + 做题记录持久化，下次对话不用重新自我介绍
-- 🗂️ **分科档案隔离** — 开四个工作目录天然分科，数据结构/计组/OS/网络互不干扰
-- 🔗 **跨科联动** — 25+ 跨科联结点，虚拟内存讲到一半提示"这里还牵连计组 TLB"
-- ✍️ **真题优先出题** — 倒排索引检索 17 年真题（791 道），命中截图展示原题，未命中自出题补位
-- 📜 **官方解析按需提取** — 作答后先给教学化解析，用户确认再从答案 PDF 提取对应官方解析
-- 🔄 **纠错闭环** — 四步法 + ⑤ 易错汇总，连错同知识点自动三管齐下（换讲法/降深度/降题难度）
-- 📚 **四科特色教法** — DS 出 C 代码、CO 出 ASCII 结构图、OS 用状态机推演、NET 分层递进
-- 🇨🇳 **王道风格术语** — 中英混杂（"TLB（Translation Lookaside Buffer，页表缓存）"），与教材无缝衔接
+- 🎯 **渐进式展开回答** — 🎯直觉 → 📚原理 → ⚠️易错 → 📝考点 → ✍️出题五层必出，细节与代码图示追问时才展开（`references/answer-template.md`）
+- 🎚️ **三水平自适应** — 初学（类比+前置知识）/ 复习（完整推理链）/ 冲刺（考点直击+真题变式）三档教学策略
+- 📝 **真题出题闭环** — `search` 检索 799 题索引 → `to_images` 截原题 → 自写四选项解析 → `chat_pdf` 按需提取官方解析
+- 🖼️ **原题截图呈现** — 公式、图表、排版以 PDF 截图原貌展示，杜绝转录走样（`pdfcraft` 的 `to_images` 命令）
+- 🔍 **扫描件 OCR 兜底** — 2019/2021/2024/2025 四份扫描版答案 PDF 经 300dpi OCR 入库，检索自动回退（`extract_exam_text.py`）
+- 🧠 **跨会话学习画像** — `.408-mentor/profile.json` 记录水平标签与逐题对错，会话重置不丢档案（`profile-manager.js`）
+- 📌 **弱项自动追踪** — 滑动窗口规则（近 10 题同一知识点 ≥3 答且正确率 <50%）自动标记弱项，回答开头主动加重辨析
+- 🩹 **纠错四步法 + ⑤易错汇总** — 鼓励 → 指错因 → 重讲推理 → 变式题，再汇总该考点 2-3 个真实踩坑点（`common-mistakes-archive.md`）
+- 🔗 **跨科拓展与综合题** — 跨科图谱尾部挂"拓展链接"；冲刺模式命中"虚拟内存+Cache+TLB"等联结点时主动推荐跨科大题（`cross-subject-hub.json`）
+- 📚 **王道/天勤风格术语** — 术语首现中英全称标注，数据结构一律 C 语言/类 C 伪代码，与 408 真题一致
+- 🛠️ **pdfcraft PDF 引擎** — 49 命令纯 Python PDF 工具箱（提取/编辑/转换/OCR/表单/安全），独立 venv 一键初始化
 
 ---
 
@@ -370,7 +392,7 @@ Skill 会自动识别问题属于哪个科目。想手动限定视角时，在�
 │   │   ├── common-mistakes-archive.md ← 四科高频易错点档案（60+ 易错点）
 │   │   ├── answer-template.md         ← 渐进式回答模板 + 水平适配规则
 │   │   └── exam-archive/              ← 真题索引档案
-│   │       ├── exam-index.json        ← 倒排索引（791 题 / 1967 知识点词条）
+│   │       ├── exam-index.json        ← 倒排索引（799 题 / 2020 知识点词条）
 │   │       ├── extracted-text/        ← 17 年真题+答案的提取文本（34 份）
 │   │       └── test-images/           ← to_images 截图出题测试图
 │   │
@@ -393,7 +415,7 @@ Skill 会自动识别问题属于哪个科目。想手动限定视角时，在�
 │   │       └── 2020-2025/            ← 2020-2025 答案 PDF
 │   │
 │   └── examples/
-│       └── example-dialogs.md         ← 5 个完整对话示例（覆盖三水平 × 四科目）
+│       └── example-dialogs.md         ← 7 个完整对话示例（覆盖三水平 × 四科目 + 真题官方解析流程）
 │
 └── PDF-Craft/                         ← PDF 处理引擎的上游 Skill（独立仓库，引擎来源）
 ```
@@ -408,7 +430,7 @@ Skill 会自动识别问题属于哪个科目。想手动限定视角时，在�
 |------|------|---------|
 | **三信号分层自适应** | 自声明设标签 / 措辞温和修正 / 做题表现局部调节，不做跨知识点水平推断 | `SKILL.md` Decision Tree |
 | **跨会话画像持久化** | 原子写入（临时文件 + rename）+ 审计轨迹 + 章节级做题统计 | `scripts/profile-manager.js` |
-| **真题倒排索引** | 791 题 / 1967 知识点词条，索引一次构建运行时只读，检索零运行时成本 | `references/exam-archive/exam-index.json` |
+| **真题倒排索引** | 799 题 / 2020 知识点词条，索引一次构建运行时只读，检索零运行时成本 | `references/exam-archive/exam-index.json` |
 | **截图出题** | `to_images` 按页码截取原题，公式/图表保留原貌不转写失真 | `scripts/pdfcraft/` + 索引 `examPage` 字段 |
 | **官方解析懒提取** | 作答后先给自写解析，用户确认才从答案 PDF 提取，不预灌上下文 | `SKILL.md` 真题出题流程 |
 | **CID 字体绕过** | PyMuPDF 直提真题文本，绕开通用 extract_text 的 CID 编码问题，失败 fallback OCR | `scripts/extract_exam_text.py` |
@@ -420,6 +442,45 @@ Skill 会自动识别问题属于哪个科目。想手动限定视角时，在�
 
 ---
 
+## 🧠 教学机制深入
+
+<details>
+<summary><b>🎚️ 三信号分层机制</b>（点击展开）</summary>
+
+三条信号作用域不同、优先级明确，避免"一锤定音"式误判：
+
+| 信号           | 作用域                     | 优先级 | 规则                                                                                 |
+| -------------- | -------------------------- | ------ | ------------------------------------------------------------------------------------ |
+| ① 用户自声明   | 设定/覆盖水平标签          | 最高   | "第一次接触"→beginner；"之前学过忘了"→review；"考前冲刺"→sprint                      |
+| ② 问题措辞推断 | 温和修正水平               | 中     | 自报初学但提问专业 → 温和上调（反之亦然）                                            |
+| ③ 做题表现     | **即时教学调节，不改标签** | 局部   | 连错同知识点 2 题 → 换讲法 + 降深度 + 降题难度（三管齐下），仅在当前知识点闭环内生效 |
+
+水平标签变更一律通过 `update-level --reason user_declared|phrasing_escalation|phrasing_downgrade` 写入画像，可追溯每次变更原因（`levelHistory`）。
+
+</details>
+
+<details>
+<summary><b>📌 弱项判定与画像字段</b>（点击展开）</summary>
+
+- **弱项规则**（`profile-manager.js` 滑动窗口）：最近 10 条同一 topic 记录中，答题数 ≥3 且正确率 <50% → 进入 `weakTopics`；正确率回升自动出列
+- **防污染**：`--correct` 非规范值（如 `True`）直接报错拒绝，绝不静默记为答错
+- **防丢更新**：并发写入经文件锁串行化（冒烟测试含 5 路并发用例）
+- **隐私**：`.408-mentor/` 已在 `.gitignore`，学习数据不会被误提交；说"重置画像"即删除
+
+</details>
+
+<details>
+<summary><b>📚 四科专属教学风格</b>（点击展开）</summary>
+
+| 科目           | 教学手段                    | 回答特色                             |
+| -------------- | --------------------------- | ------------------------------------ |
+| 数据结构       | C 代码段 + 时空复杂度对比   | 分析代码执行过程，对比结构优劣       |
+| 计算机组成原理 | ASCII 结构图 + 数据通路推演 | 字符画展示硬件结构，逐步推演信号流动 |
+| 操作系统       | 状态机思维 + PV 操作推演    | 状态转换图描述进程，逐步推演同步互斥 |
+| 计算机网络     | 分层递进 + 协议流程推演     | 逐层分析，展示协议交互与报文格式     |
+
+</details>
+
 ## 🗺️ Roadmap
 
 - [x] 渐进式展开回答结构
@@ -429,34 +490,22 @@ Skill 会自动识别问题属于哪个科目。想手动限定视角时，在�
 - [x] 跨科知识联动
 - [x] 纠错四步法 + ⑤ 易错汇总
 - [x] 真题资料就位（17 年真题 + 答案 PDF 已导入 `data/`，PDF-Craft 引擎已集成）
-- [x] 真题索引构建（倒排索引已建成：791 题 / 1967 知识点词条，支持按知识点检索真题出题）
+- [x] 真题索引构建（倒排索引已建成：799 题 / 2020 知识点词条，支持按知识点检索真题出题）
 - [ ] 结构化教学功能迭代（识别知识点后给出该章节完整知识图谱）
-- [ ] 薄弱知识点自动识别（基于做题记录的章节正确率分析，扩展 JSON 的 `weakTopics` 字段）
+- [x] 薄弱知识点自动识别（`weakTopics` 由 `update-question` 自动维护：同 topic 近 10 题答 ≥3 且正确率 <50% 入列，表现回升自动出列）
 - [ ] 官方答案深度解析结构化（从答案 PDF 提取的解析对齐到逐选项粒度）
 - [ ] 2009/2012 综合题 OCR 重提取（这两年综合题 extracted-text 存在 CID 字体乱码，选择题正常，需重跑 OCR fallback 或换提取参数）
 
 ---
 
-## 🤝 贡献
-
-欢迎 Fork → Branch → PR。特别欢迎以下贡献：
-
-- 📝 补充 `common-mistakes-archive.md` 中的真实易错点（你踩过的坑就是下一个学生的避雷针）
-- 🔗 扩展 `cross-subject-graph.md` 的跨科联结点
-- 🏷️ 校正 `exam-index.json` 中的知识点标注（标注由 LLM 生成，欢迎人工复核纠错）
-
----
-
-## 📄 License
-
-MIT
-
----
-
 <div align="center">
 
-**如果这个 Skill 帮到了你，给个 ⭐ 让更多考研人看到。**
+## 🤝 参与贡献
 
-*愿每一位 408 考生都能遇见自己的良师。*
+**Fork → Branch → PR**，欢迎贡献易错点档案、跨科联结点与工具链改进！
+
+📜 本项目基于 [MIT License](./LICENSE) 开源 · 仓库地址：[WeatherCore/408](https://github.com/WeatherCore/408)
+
+如果这个项目帮到了你的 408 备考，欢迎点一个 ⭐ 让更多考研人看到
 
 </div>
