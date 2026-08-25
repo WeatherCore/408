@@ -54,6 +54,9 @@ function resolveProfilePaths(cwd) {
 /**
  * 从章节名推断科目。支持 "OS-内存管理"、"CO-存储系统" 等显式前缀，
  * 也支持常见章节关键词兜底。
+ *
+ * 注意：兜底仅作显示/统计用途，真实科目归属应以索引 topics 字段为准
+ * （weakTopics.subject 给画像统计看，不参与出题检索）。
  */
 function inferSubjectFromChapter(chapter) {
   if (!chapter || typeof chapter !== 'string') return 'unknown';
@@ -61,10 +64,16 @@ function inferSubjectFromChapter(chapter) {
   if (VALID_SUBJECTS.has(prefix)) return prefix;
 
   const lower = chapter.toLowerCase();
-  if (lower.includes('数据') || lower.includes('图') || lower.includes('树') || lower.includes('排序') || lower.includes('查找')) return 'ds';
-  if (lower.includes('组成') || lower.includes('cache') || lower.includes('tlb') || lower.includes('流水线') || lower.includes('指令') || lower.includes('alu') || lower.includes('浮点')) return 'co';
-  if (lower.includes('操作') || lower.includes('进程') || lower.includes('内存') || lower.includes('文件') || lower.includes('io') || lower.includes('pv') || lower.includes('死锁')) return 'os';
-  if (lower.includes('网络') || lower.includes('tcp') || lower.includes('ip') || lower.includes('路由') || lower.includes('协议') || lower.includes('http') || lower.includes('dns')) return 'net';
+  // 兜底关键词按科目分组，命中第一组即返回（顺序即优先级）
+  const KEYWORDS = {
+    ds: ['数据结构', '线性表', '链表', '数组', '栈', '队列', '串', '树', '二叉树', '图', '排序', '查找', '哈希', '递归', '贪心', '动态规划', '复杂度'],
+    co: ['计算机组成', '组成原理', 'cpu', 'alu', '寄存器', '主存', '存储器', 'cache', 'tlb', '总线', '数据通路', '流水线', '指令系统', '寻址', '中断', '浮点', '物理地址', '磁盘'],
+    os: ['操作系统', '进程', '线程', '调度', '同步', '互斥', 'pv', '死锁', '内存', '分页', '分段', '段页式', '虚拟内存', '页面置换', '文件', 'io', 'spooling'],
+    net: ['计算机网络', '网络', '协议', 'tcp', 'udp', 'ip', 'mac', 'arp', 'icmp', '路由', 'ospf', '拥塞', '滑动窗口', 'csma', '以太网', '分组', '报文', 'socket', '套接字', 'http', 'dns', 'smtp', 'ftp', 'pop3'],
+  };
+  for (const [subj, words] of Object.entries(KEYWORDS)) {
+    if (words.some((w) => lower.includes(w.toLowerCase()))) return subj;
+  }
   return 'unknown';
 }
 
@@ -144,6 +153,19 @@ function writeProfile(profile) {
 const LOCK_TIMEOUT_MS = 8000;
 const LOCK_STALE_MS = 10000;
 
+// 退出清理：用 flag 保证 exit handler 只注册一次，Set 收集所有待清理锁
+let _exitCleanupRegistered = false;
+const _locksToCleanup = new Set();
+function registerExitCleanup() {
+  if (_exitCleanupRegistered) return;
+  _exitCleanupRegistered = true;
+  process.on('exit', () => {
+    for (const p of _locksToCleanup) {
+      try { fs.unlinkSync(p); } catch { /* 已不存在则忽略 */ }
+    }
+  });
+}
+
 function acquireProfileLock() {
   // 全新目录下 PROFILE_DIR 可能尚不存在（init 前创建锁文件会 ENOENT）
   fs.mkdirSync(PROFILE_DIR, { recursive: true });
@@ -153,10 +175,10 @@ function acquireProfileLock() {
     try {
       fs.closeSync(fs.openSync(lockPath, 'wx'));
       // 注意：校验失败等路径会在持锁区 process.exit(1)，finally 不会执行；
-      // exit 钩子是同步回调、process.exit 时仍会触发，用它兜底释放锁
-      process.on('exit', () => {
-        try { fs.unlinkSync(lockPath); } catch { /* 已不存在则忽略 */ }
-      });
+      // exit 钩子是同步回调、process.exit 时仍会触发，用它兜底释放锁。
+      // 用模块级 flag 保证 exit handler 只注册一次，避免多次调用累积注册。
+      _locksToCleanup.add(lockPath);
+      registerExitCleanup();
       return lockPath;
     } catch (e) {
       if (e.code !== 'EEXIST') throw e;
