@@ -7,7 +7,7 @@
 ## 示例 1：🟢 初学 — 第一次接触虚拟内存
 
 ```
-你：/408 我第一次接触虚拟内存，完全看不懂是什么
+你：我第一次接触虚拟内存，完全看不懂是什么
 
 🤖 408-mentor：
 
@@ -54,7 +54,7 @@ D) 替代 Cache 的功能
 ## 示例 2：🟡 复习 — 追问 TLB + 跨科联动
 
 ```
-你：/408 讲一下 TLB 是什么，它在地址转换中起什么作用
+你：讲一下 TLB 是什么，它在地址转换中起什么作用
 
 🤖 408-mentor：
 
@@ -110,7 +110,7 @@ D) TLB 通常用相联存储器实现
 ## 示例 3：🟡 复习 → 🔴 冲刺 — 连续追问 + 纠错
 
 ```
-你：/408 进程和线程的区别
+你：进程和线程的区别
 
 🤖 408-mentor：
 
@@ -166,7 +166,7 @@ D 错——每个线程有自己独立的栈空间，不共享栈。
 ## 示例 4：🔴 冲刺 — 考点直击 + 综合题
 
 ```
-你：/408 [co] Cache 的三种映射方式，给我快速过一遍考点
+你：[co] Cache 的三种映射方式，给我快速过一遍考点
 
 🤖 408-mentor：
 
@@ -212,7 +212,7 @@ A) 4 位  B) 6 位  C) 8 位  D) 16 位
 ## 示例 5：🌐 跨科综合大题的追问处理
 
 ```
-你：/408 能说一下缺页中断和普通中断的区别吗？这个问题困扰我很久
+你：能说一下缺页中断和普通中断的区别吗？这个问题困扰我很久
 
 🤖 408-mentor：
 
@@ -255,7 +255,7 @@ D) 缺页中断和普通外部中断一样可以被屏蔽
 > 前置画像：level = sprint，且用户此前已在「虚拟内存」上连续答错，weakTopics 中包含该 topic。
 
 ```
-你：/408 [os] 虚拟地址到物理地址的转换过程，越完整越好
+你：[os] 虚拟地址到物理地址的转换过程，越完整越好
 
 🤖 408-mentor：
 
@@ -313,12 +313,12 @@ A) 24 ns  B) 27 ns  C) 31 ns  D) 40 ns
 >
 > **内部动作（学生不可见，按序执行）：**
 > ① `node scripts/exam-pdf-loader.js search 虚拟存储器` → 命中 [2012] 第25题 | choice | 第3页 | os
-> ② `python scripts/pdfcraft/pdfcraft.py to_images --input data/exams/2010-2019/2012.pdf --output_dir <输出目录> --pages "[2]"`（examPage=3，`--pages` 0 基需减 1）
+> ② `python scripts/question_clip.py shot 2012 25 <输出目录>`（自动按索引 clip 裁剪为单题，无需 0 基换算）
 > ③ 作答后：`node scripts/profile-manager.js update-question --chapter 3-内存管理 --topic 虚拟存储器 --correct false --difficulty medium`
 > ④ 用户确认看官方解析后：`python scripts/pdfcraft/pdfcraft.py chat_pdf --input data/answers/2010-2019/2012-answer.pdf --question "虚拟存储器 连续分配" --text_fallback references/exam-archive/extracted-text/2012-answer.txt`
 
 ```
-你：/408 [os] 虚拟存储器到底是什么，总是云里雾里的
+你：[os] 虚拟存储器到底是什么，总是云里雾里的
 
 🤖 408-mentor：
 
