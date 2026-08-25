@@ -355,12 +355,12 @@ function showStats() {
  */
 function backfill(force) {
   if (!fs.existsSync(INDEX_PATH)) {
-    console.log(' 索引尚未建立，无法回填。');
+    console.log('[WARN] 索引尚未建立，无法回填。');
     return;
   }
   const splitFiles = fs.readdirSync(ARCHIVE_DIR).filter(f => /^split-\d{4}\.json$/.test(f)).sort();
   if (splitFiles.length === 0) {
-    console.log(' 未找到 split-<年份>.json，请先运行 split <年份>。');
+    console.log('[WARN] 未找到 split-<年份>.json，请先运行 split <年份>。');
     return;
   }
 
@@ -416,7 +416,7 @@ function backfill(force) {
  */
 function searchIndex(keywords) {
   if (!fs.existsSync(INDEX_PATH)) {
-    console.log(' 索引尚未建立，无法搜索。');
+    console.log('[WARN] 索引尚未建立，无法搜索。');
     return;
   }
 
