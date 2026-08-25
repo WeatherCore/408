@@ -13,16 +13,17 @@
  *   node scripts/exam-pdf-loader.js extract-all          # 批处理所有年份的 PDF 文本
  *   node scripts/exam-pdf-loader.js split <年份>          # 按题号分割指定年份的文本
  *   node scripts/exam-pdf-loader.js backfill              # 将 split 产物的 examPage/rawText 回填进索引
+ *   node scripts/exam-pdf-loader.js backfill --force      # 同上，并强制刷新已存在的 rawText/examPage
  *   node scripts/exam-pdf-loader.js list                  # 列出所有已提取的年份
  *   node scripts/exam-pdf-loader.js stats                 # 查看题库统计
- *   node scripts/exam-pdf-loader.js search <关键词>...     # 搜索索引中的题目（多关键词为 AND）
+ *   node scripts/exam-pdf-loader.js search <关键词>...     # 搜索索引中的题目（多关键词 AND；topics 命中优先）
  *   node scripts/exam-pdf-loader.js --help                # 显示帮助
  *
  * 设计说明：
  * - 纯文本提取和分割由此脚本完成（确定性操作）
  * - 知识点标注（LLM 逐题分析）不在脚本中，由 408-mentor 的 LLM 上下文完成
  * - 标注完成后，结果写入 exam-index.json，后续检索一律通过 search 子命令，
- *   不要直接 Read 该文件（约 400KB，会撑爆上下文）
+ *   不要直接 Read 该文件（约 800KB，会撑爆上下文）
  */
 
 const fs = require('fs');
@@ -58,6 +59,16 @@ function ensureDirs() {
   [ARCHIVE_DIR, TEXT_DIR].forEach(dir => {
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   });
+}
+
+/**
+ * 清理提取文本中的页标记与多余空行，避免页标记残留进 rawText 干扰检索与展示
+ */
+function stripPageMarkers(raw) {
+  return raw
+    .replace(/===\s*第\s*\d+\s*页\s*===/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 /**
@@ -227,7 +238,7 @@ function splitByYear(year) {
         year,
         number: num,
         type: 'choice',
-        rawText: match[2].trim().substring(0, 500),
+        rawText: stripPageMarkers(match[2]).substring(0, 500),
         examPage: getCurrentPageFromIndex(match.index),
       });
     }
@@ -241,9 +252,9 @@ function splitByYear(year) {
     questions.push({
       year,
       number: num,
-      type: 'comprehensive',
-      rawText: match[2].trim().substring(0, 800),
-      examPage: getCurrentPageFromIndex(match.index),
+        type: 'comprehensive',
+        rawText: stripPageMarkers(match[2]).substring(0, 800),
+        examPage: getCurrentPageFromIndex(match.index),
     });
   }
 
@@ -336,18 +347,20 @@ function showStats() {
  * 将 split-<年份>.json 中的 examPage/rawText 回填到 exam-index.json
  *
  * 索引由「split 产物 + LLM 标注」合成，标注环节可能丢失字段或整题
- * （2026-08 审计：791 题全部丢 rawText、431 题丢 examPage、2015 年 #40-47 漏标）。
+ *（2026-08 审计：791 题全部丢 rawText、431 题丢 examPage、2015 年 #40-47 漏标）。
  * split 产物是数据源头（页码 100% 有值），本命令以 split 为准做幂等回填：
  * 索引已有的题合并缺失字段；split 有而索引没有的题以最小字段补入（topics 留空待标注）。
+ *
+ * @param {boolean} force 为 true 时以 split 的 rawText/examPage 强制覆盖索引旧值（用于清理格式噪音）
  */
-function backfill() {
+function backfill(force) {
   if (!fs.existsSync(INDEX_PATH)) {
-    console.log('📭 索引尚未建立，无法回填。');
+    console.log(' 索引尚未建立，无法回填。');
     return;
   }
   const splitFiles = fs.readdirSync(ARCHIVE_DIR).filter(f => /^split-\d{4}\.json$/.test(f)).sort();
   if (splitFiles.length === 0) {
-    console.log('📭 未找到 split-<年份>.json，请先运行 split <年份>。');
+    console.log(' 未找到 split-<年份>.json，请先运行 split <年份>。');
     return;
   }
 
@@ -362,8 +375,8 @@ function backfill() {
       const key = `${s.year}-${s.number}`;
       const q = byKey.get(key);
       if (q) {
-        if (s.examPage && !q.examPage) q.examPage = s.examPage;
-        if (s.rawText && !q.rawText) q.rawText = s.rawText;
+        if (s.examPage && (force || !q.examPage)) q.examPage = s.examPage;
+        if (s.rawText && (force || !q.rawText)) q.rawText = s.rawText;
         merged++;
       } else {
         byKey.set(key, {
@@ -375,7 +388,6 @@ function backfill() {
           topics: [],
           difficulty: null,
           examPage: s.examPage || 0,
-          answerPage: 0,
           rawText: s.rawText || '',
         });
         added++;
@@ -398,13 +410,13 @@ function backfill() {
 /**
  * 搜索索引中的题目
  *
- * 多关键词为 AND 语义（topics + rawText 需同时包含全部关键词），
- * 供跨科综合题检索（如 search 虚拟内存 TLB）。
- * 结果按年份倒序，与「优先近 6 年真题」的出题策略一致。
+ * 多关键词为 AND 语义（topics + rawText 需同时包含全部关键词）。
+ * 排序规则：topics 命中权重（10 分/词）远高于 rawText 命中（1 分/词），
+ * 得分相同则按年份倒序（优先近 6 年真题）。
  */
 function searchIndex(keywords) {
   if (!fs.existsSync(INDEX_PATH)) {
-    console.log('📭 索引尚未建立，无法搜索。');
+    console.log(' 索引尚未建立，无法搜索。');
     return;
   }
 
@@ -412,23 +424,33 @@ function searchIndex(keywords) {
   const questions = index.questions || [];
   const kws = keywords.map(k => k.toLowerCase());
 
-  const matches = questions.filter(q => {
-    const text = `${q.topics?.join(' ') || ''} ${q.rawText || ''}`.toLowerCase();
-    return kws.every(kw => text.includes(kw));
-  });
-  matches.sort((a, b) => b.year - a.year || a.number - b.number);
+  const scored = [];
+  for (const q of questions) {
+    const topicsText = (q.topics?.join(' ') || '').toLowerCase();
+    const rawText = (q.rawText || '').toLowerCase();
+    const combined = `${topicsText} ${rawText}`;
+    if (!kws.every(kw => combined.includes(kw))) continue;
 
-  console.log(`\n🔍 搜索 ${keywords.map(k => `"${k}"`).join(' + ')}：${matches.length} 条结果\n`);
-  matches.slice(0, 10).forEach(q => {
+    let score = 0;
+    for (const kw of kws) {
+      if (topicsText.includes(kw)) score += 10;
+      if (rawText.includes(kw)) score += 1;
+    }
+    scored.push({ q, score });
+  }
+  scored.sort((a, b) => b.score - a.score || b.q.year - a.q.year || a.q.number - b.q.number);
+
+  console.log(`\n🔍 搜索 ${keywords.map(k => `"${k}"`).join(' + ')}：${scored.length} 条结果\n`);
+  scored.slice(0, 10).forEach(({ q, score }) => {
     const page = q.examPage ? `第${q.examPage}页` : '页码未知';
-    console.log(`[${q.year}] 第${q.number}题 | ${q.type} | ${page} | ${q.subject || '?'} | ${q.topics?.join(', ') || '未标注'}`);
+    console.log(`[${q.year}] 第${q.number}题 | ${q.type} | ${page} | ${q.subject || '?'} | 得分${score} | ${q.topics?.join(', ') || '未标注'}`);
     if (q.rawText) {
       console.log(`   ${q.rawText.substring(0, 100).replace(/\n/g, ' ')}…`);
     }
     console.log();
   });
-  if (matches.length > 10) {
-    console.log(`   …仅显示前 10 条，共 ${matches.length} 条`);
+  if (scored.length > 10) {
+    console.log(`   …仅显示前 10 条，共 ${scored.length} 条`);
   }
 }
 
@@ -439,15 +461,16 @@ function showHelp() {
   console.log(`  extract-all           批处理所有年份 PDF 文本提取`);
   console.log(`  split <年份>          按题号分割指定年份的真题（如 split 2024）`);
   console.log(`  backfill              将 split 产物的 examPage/rawText 回填进索引`);
+  console.log(`  backfill --force      同上，并强制刷新已存在的 rawText/examPage（用于清理格式噪音）`);
   console.log(`  list                  列出所有已提取的年份`);
   console.log(`  stats                 查看题库统计`);
-  console.log(`  search <关键词>...     搜索索引中的题目（多关键词为 AND）`);
+  console.log(`  search <关键词>...     搜索索引中的题目（多关键词 AND；topics 命中优先于 rawText 命中）`);
   console.log(`  --help                显示帮助`);
 console.log(`\n索引构建流程：`);
   console.log(`  1. extract-all  → 提取 34 个 PDF 的纯文本`);
   console.log(`  2. split <年份>  → 逐题分割为结构化 JSON`);
   console.log(`  3. LLM 标注     → 逐题分析知识点（由 408-mentor 的 LLM 完成）`);
-  console.log(`  4. backfill     → 将 split 的 examPage/rawText 回填进索引（防标注丢字段）`);
+  console.log(`  4. backfill     → 将 split 的 examPage/rawText 回填进索引（--force 可强制刷新）`);
   console.log(`  5. 写入索引     → 生成 exam-index.json（倒排索引）`);
   console.log(`\n前置条件：`);
   console.log(`  运行 scripts/pdfcraft/setup.bat 初始化 Python 环境`);
@@ -475,7 +498,7 @@ function main() {
       showStats();
       break;
     case 'backfill':
-      backfill();
+      backfill(args.includes('--force'));
       break;
     case 'search':
       if (!args[1]) {
