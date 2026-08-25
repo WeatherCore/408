@@ -138,6 +138,45 @@ async function mainAsync() {
     const firstLine = searchOut.split('\n').find(l => l.trim().startsWith('['));
     assert(firstLine && firstLine.includes('2023'), `搜索 虚拟内存 首条为 topics 命中（实际首条: ${firstLine}`);
 
+    // 8. question_clip shot：抽一道题渲染 PNG，验证核心交付路径（学生实际看到的单题截图）
+    //    依赖 PyMuPDF venv；venv launcher 指向已删除的 base python 时 SKIP 而非 FAIL
+    //    （环境依赖，非逻辑缺陷；运行 scripts/pdfcraft/setup.bat 修复后可真正执行）
+    const shotOut = path.join(TEST_DIR, 'shots');
+    const qcScript = path.join(ROOT, 'scripts', 'question_clip.py');
+    const venvPy = path.join(ROOT, 'scripts', 'pdfcraft', 'venv', 'Scripts', 'python.exe');
+    const pyBin = fs.existsSync(venvPy) ? venvPy : 'python';
+    let venvReady = true;
+    try {
+      execSync(`"${pyBin}" -c "import fitz"`, { encoding: 'utf-8', timeout: 15000 });
+    } catch (e) {
+      venvReady = false;
+      console.log(`⏭️  SKIP: question_clip shot（PyMuPDF venv 不可用：${(e.message || '').split('\n')[0]}；运行 scripts/pdfcraft/setup.bat 修复后可测）`);
+    }
+    if (venvReady) {
+      try {
+        execSync(`"${pyBin}" "${qcScript}" shot 2023 28 "${shotOut}"`, { encoding: 'utf-8', cwd: ROOT, timeout: 60000 });
+        const pngPath = path.join(shotOut, '2023_Q28.png');
+        assert(fs.existsSync(pngPath), 'question_clip shot 生成 PNG 文件');
+        const stat = fs.statSync(pngPath);
+        assert(stat.size > 10240, `shot PNG 体积合理（>10KB，实际 ${(stat.size / 1024).toFixed(1)}KB）`);
+      } catch (e) {
+        assert(false, `question_clip shot 执行失败：${e.message.split('\n')[0]}`);
+      }
+    }
+
+    // 9. 多关键词 AND 语义 + topics 命中权重
+    //    正向：共现子串（虚拟+内存）应命中；负向：不共现词应返回空（证明 AND 非 OR）
+    const andHit = execSync(`"${NODE}" "${path.join(ROOT, 'scripts', 'exam-pdf-loader.js')}" search 虚拟 内存`, { encoding: 'utf-8', cwd: ROOT });
+    const hitLines = andHit.split('\n').filter(l => l.trim().startsWith('['));
+    assert(hitLines.length > 0, `共现词 AND 返回结果（虚拟+内存，实际 ${hitLines.length} 条）`);
+    const andMiss = execSync(`"${NODE}" "${path.join(ROOT, 'scripts', 'exam-pdf-loader.js')}" search 虚拟内存 哈夫曼`, { encoding: 'utf-8', cwd: ROOT });
+    const missLines = andMiss.split('\n').filter(l => l.trim().startsWith('['));
+    assert(missLines.length === 0, `不共现词 AND 返回空（证明 AND 非 OR，实际 ${missLines.length} 条）`);
+    const singleOut2 = execSync(`"${NODE}" "${path.join(ROOT, 'scripts', 'exam-pdf-loader.js')}" search 虚拟内存`, { encoding: 'utf-8', cwd: ROOT });
+    const singleFirst = singleOut2.split('\n').find(l => l.trim().startsWith('['));
+    const scoreMatch = singleFirst && singleFirst.match(/得分(\d+)/);
+    assert(scoreMatch && parseInt(scoreMatch[1], 10) >= 10, `首条为 topics 命中（得分>=10，实际 ${scoreMatch ? scoreMatch[1] : '无'}）`);
+
     console.log('\n🎉 所有冒烟测试通过');
 }
 
