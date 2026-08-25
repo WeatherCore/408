@@ -17,6 +17,10 @@ const NODE = process.execPath;
 const SCRIPT = path.join(__dirname, 'profile-manager.js');
 const TEST_DIR = path.join(require('os').tmpdir(), `408-mentor-smoke-${Date.now()}`);
 
+// 索引相关路径
+const ROOT = path.resolve(__dirname, '..');
+const INDEX_PATH = path.join(ROOT, 'references', 'exam-archive', 'exam-index.json');
+
 function run(args) {
   const out = execFileSync(NODE, [SCRIPT, '--cwd', TEST_DIR, ...args], {
     encoding: 'utf-8',
@@ -115,6 +119,24 @@ async function mainAsync() {
     // 5. reset
     const resetRes = run(['reset']);
     assert(resetRes.reset === true && !fs.existsSync(path.join(TEST_DIR, '.408-mentor', 'profile.json')), 'reset 删除画像文件');
+
+    // 6. 索引完整性（无需画像目录，直接读仓库索引）
+    const index = JSON.parse(fs.readFileSync(INDEX_PATH, 'utf-8'));
+    const questions = index.questions || [];
+
+    assert(questions.length === 799, '索引共 799 题');
+    assert(!questions.some(q => 'answerPage' in q), '索引中不存在 answerPage 死字段');
+    assert(questions.every(q => q.examPage && q.examPage > 0), '所有题 examPage > 0');
+    assert(questions.every(q => q.rawText && q.rawText.length >= 10), '所有题 rawText 非空');
+    assert(!questions.some(q => q.rawText && q.rawText.includes('=== 第')), 'rawText 不含页标记残留');
+    const clipCount = questions.filter(q => q.clip && Array.isArray(q.clip)).length;
+    assert(clipCount >= 798, `clip 覆盖率 ≥ 99%（实际 ${clipCount}/${questions.length}）`);
+
+    // 7. 搜索排名："虚拟内存" 应优先 topics 命中的题目（2023/2012/2011）而非 rawText 命中的 VFS 题
+    const { execSync } = require('child_process');
+    const searchOut = execSync(`"${NODE}" "${path.join(ROOT, 'scripts', 'exam-pdf-loader.js')}" search 虚拟内存`, { encoding: 'utf-8', cwd: ROOT });
+    const firstLine = searchOut.split('\n').find(l => l.trim().startsWith('['));
+    assert(firstLine && firstLine.includes('2023'), `搜索 虚拟内存 首条为 topics 命中（实际首条: ${firstLine}`);
 
     console.log('\n🎉 所有冒烟测试通过');
 }
