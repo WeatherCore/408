@@ -74,6 +74,18 @@ echo [OK] Python !PV! - downloaded
 
 :found_python
 
+REM --- 1.5 venv 健康自检 ---
+REM 历史环境曾出现 venv 的 pyvenv.cfg 指向已删除的 base python（如 D:\python3.13.0），
+REM 导致 venv 的 python 启动即报 "No Python at ..."，真题截图与官方解析提取整条链路不可达。
+REM 这里若 venv 已存在但 import fitz 失败（base 失效 / 依赖缺失），直接删除重建，避免沉默损坏。
+if exist "!VENV_DIR!" (
+    "!VENV_DIR!\Scripts\python.exe" -c "import fitz" >nul 2>nul
+    if !errorlevel! NEQ 0 (
+        echo [WARN] 现有 venv 已损坏（base python 失效或 PyMuPDF 缺失），自动重建...
+        rmdir /s /q "!VENV_DIR!" >nul 2>nul
+    )
+)
+
 REM --- 2. Create venv ---
 set "VPYTHON=!VENV_DIR!\Scripts\python.exe"
 
