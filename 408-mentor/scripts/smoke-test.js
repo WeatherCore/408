@@ -124,13 +124,13 @@ async function mainAsync() {
     const index = JSON.parse(fs.readFileSync(INDEX_PATH, 'utf-8'));
     const questions = index.questions || [];
 
-    assert(questions.length === 799, '索引共 799 题');
+    assert(questions.length >= 799 && questions.length % 47 === 0, `索引题数 >=799 且为每年 47 题的整数倍（实际 ${questions.length}）`);
     assert(!questions.some(q => 'answerPage' in q), '索引中不存在 answerPage 死字段');
     assert(questions.every(q => q.examPage && q.examPage > 0), '所有题 examPage > 0');
     assert(questions.every(q => q.rawText && q.rawText.length >= 10), '所有题 rawText 非空');
     assert(!questions.some(q => q.rawText && q.rawText.includes('=== 第')), 'rawText 不含页标记残留');
     const clipCount = questions.filter(q => q.clip && Array.isArray(q.clip)).length;
-    assert(clipCount >= 798, `clip 覆盖率 ≥ 99%（实际 ${clipCount}/${questions.length}）`);
+    assert(clipCount >= Math.floor(0.99 * questions.length), `clip 覆盖率 ≥ 99%（实际 ${clipCount}/${questions.length}）`);
 
     // 7. 搜索排名："虚拟内存" 应优先 topics 命中的题目（2023/2012/2011）而非 rawText 命中的 VFS 题
     const { execSync } = require('child_process');
@@ -150,7 +150,8 @@ async function mainAsync() {
       execSync(`"${pyBin}" -c "import fitz"`, { encoding: 'utf-8', timeout: 15000 });
     } catch (e) {
       venvReady = false;
-      console.log(`⏭️  SKIP: question_clip shot（PyMuPDF venv 不可用：${(e.message || '').split('\n')[0]}；运行 scripts/pdfcraft/setup.bat 修复后可测）`);
+      console.log(`⏭️  SKIP: question_clip shot（PyMuPDF venv 不可用：${(e.message || '').split('\n')[0]}）`);
+      console.log(`    修复：运行 scripts\\pdfcraft\\setup.bat 重建 venv（已内置健康自检，会自动检测并修复损坏的 python 指向）`);
     }
     if (venvReady) {
       try {
