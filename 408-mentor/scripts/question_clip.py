@@ -18,6 +18,7 @@ import json
 import os
 import re
 import sys
+from typing import List, Tuple
 
 # 激活 pdfcraft venv（镜像 pdfcraft.py 的引导逻辑）
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -59,8 +60,8 @@ ROOT = os.path.dirname(_SCRIPT_DIR)
 INDEX_PATH = os.path.join(ROOT, "references", "exam-archive", "exam-index.json")
 EXAMS_DIR = os.path.join(ROOT, "data", "exams")
 DEFAULT_DPI = 150
-PAD_TOP = 6
-PAD_BOTTOM = 6
+PAD_BOTTOM = 2.0   # 内容最后一行下方保留的空白（真题行距紧，过大会切掉选项）
+GUARD_NEXT = 1.0   # 距下一题/页脚行框顶部的最小间隔（真题题间距仅约 3pt，必须小于它才不切字）
 PAD_LEFT = 8
 PAD_RIGHT = 36
 LEFT_MARGIN_THRESHOLD = 60  # pt，题号行通常靠近左页边（约 40pt）
@@ -70,9 +71,8 @@ def subdir_for_year(year):
     return "2010-2019" if year <= 2019 else "2020-2025"
 
 
-def get_page_lines(page):
-    """按从上到下、从左到右排序的行列表，每项 (text, bbox)"""
-    d = page.get_text("dict")
+def get_lines_from_dict(d) -> List[Tuple[str, list]]:
+    """从 get_text("dict") 结果提取文字行，按从上到下、从左到右排序，每项 (text, bbox)"""
     lines = []
     for block in d.get("blocks", []):
         if block.get("type") != 0:
@@ -83,6 +83,11 @@ def get_page_lines(page):
             lines.append((text.strip(), bbox))
     lines.sort(key=lambda t: (round(t[1][1], 1), t[1][0]))
     return lines
+
+
+def get_image_bboxes(d) -> List[list]:
+    """页内位图块（题图）的 bbox 列表。图可能延伸到最后一行文字之下，算内容底边时必须纳入。"""
+    return [b["bbox"] for b in d.get("blocks", []) if b.get("type") == 1]
 
 
 def find_question_start(lines, number, page_width):
@@ -127,7 +132,9 @@ def compute_clip(year, number, exam_page):
             return None, "页码越界"
 
         page = doc[exam_page - 1]
-        lines = get_page_lines(page)
+        d = page.get_text("dict")
+        lines = get_lines_from_dict(d)
+        image_bboxes = get_image_bboxes(d)
         page_width = page.rect.width
         page_height = page.rect.height
 
@@ -140,7 +147,7 @@ def compute_clip(year, number, exam_page):
         f_y = footer_y(lines, page_height, year)
 
         # 下一题：在同页查找大于当前题号的行
-        next_bbox, _ = None, -1
+        next_bbox = None
         for text2, bbox2 in lines:
             m = re.match(r"^\s*(\d{1,2})\s*[\.．\、]?\s*", text2)
             if m:
@@ -149,11 +156,20 @@ def compute_clip(year, number, exam_page):
                     next_bbox = bbox2
                     break
 
-        y0 = max(0, start_bbox[1] - PAD_TOP)
-        if next_bbox:
-            y1 = next_bbox[1] - PAD_BOTTOM
-        else:
-            y1 = f_y - PAD_BOTTOM
+        # 内容底边：题号行顶 → 下一题/页脚顶之间所有文字行与题图的最大底边。
+        # 不得按「下一题顶 - 固定间距」倒推：真题版式题间距仅约 3pt，倒推必切掉
+        # 选项行；也不得从题号行顶向上扩：会混入上一题选项行（串题）。
+        limit_y = next_bbox[1] if next_bbox else f_y
+        content_bottom = start_bbox[3]
+        for _, bbox2 in lines:
+            if bbox2[1] >= start_bbox[1] - 0.1 and bbox2[3] <= limit_y + 0.1:
+                content_bottom = max(content_bottom, bbox2[3])
+        for bbox2 in image_bboxes:
+            if bbox2[1] >= start_bbox[1] - 0.1 and bbox2[3] <= limit_y + 0.1:
+                content_bottom = max(content_bottom, bbox2[3])
+
+        y0 = max(0, start_bbox[1])
+        y1 = min(content_bottom + PAD_BOTTOM, limit_y - GUARD_NEXT)
 
         x0 = max(0, start_bbox[0] - PAD_LEFT)
         x1 = min(page_width, page_width - PAD_RIGHT)
