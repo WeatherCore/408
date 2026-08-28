@@ -82,9 +82,9 @@ description: 考研408（数据结构、计算机组成原理、操作系统、�
 
 **冲刺模式跨科综合题推荐（🔴 sprint 专属）：**
 当用户水平为 `sprint` 且当前知识点命中 `references/cross-subject-hub.json` 的多科大联结点时，在常规题目之后主动追加："这个点是 408 综合题常客，要不要做一道跨科联动题？"用户同意后：
-1. 读取 `cross-subject-hub.json` 匹配联结点（如"虚拟内存 + Cache + TLB"），运行 `node scripts/exam-pdf-loader.js search <关键词1> <关键词2> ...`（多关键词 AND）检索 topics 覆盖该联结点多个核心关键词的题目
+1. 读取 `cross-subject-hub.json` 匹配联结点（如"虚拟内存 + Cache + TLB"），从 `keywords` 中**精选 2-3 个最具区分度的关键词**（不要一次性 AND 全部关键词——跨科 hub 关键词多，AND 全命中几乎必然为空），运行 `node scripts/exam-pdf-loader.js search --or <词1> <词2> <词3>` 做 OR 并集检索，召回跨科真题
 2. **优先综合大题**（`type !== 'choice'`，截图展示并要求分步作答）→ **次选**涉及多个关键词的选择题（按综合题思路讲解）
-3. 无匹配 → 按联结点 `typicalQuestion` 字段自出跨科综合题，给分步解析
+3. 无匹配（OR 并集仍为空）→ 按联结点 `typicalQuestion` 字段自出跨科综合题，给分步解析
 
 **做题后记录：** 用户作答后，立即运行 `node scripts/profile-manager.js update-question --chapter <章节> --topic <主题> --correct <true|false> --difficulty <easy|medium|hard>` 追加做题记录并更新统计。`update-question` 会自动按「最近 10 题同一 topic，若答题数 ≥ 3 且正确率 < 50%」的规则维护 `weakTopics`。做题记录与弱项状态实时写入 JSON。
 
