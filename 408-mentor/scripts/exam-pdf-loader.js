@@ -16,7 +16,8 @@
  *   node scripts/exam-pdf-loader.js backfill --force      # 同上，并强制刷新已存在的 rawText/examPage
  *   node scripts/exam-pdf-loader.js list                  # 列出所有已提取的年份
  *   node scripts/exam-pdf-loader.js stats                 # 查看题库统计
- *   node scripts/exam-pdf-loader.js search <关键词>...     # 搜索索引中的题目（多关键词 AND；topics 命中优先）
+ *   node scripts/exam-pdf-loader.js search <关键词>...       # 搜索索引中的题目（多关键词 AND；topics 命中优先）
+ *   node scripts/exam-pdf-loader.js search --or <关键词>...  # 多关键词 OR（并集去重，用于跨科综合题检索）
  *   node scripts/exam-pdf-loader.js --help                # 显示帮助
  *
  * 设计说明：
@@ -410,11 +411,14 @@ function backfill(force) {
 /**
  * 搜索索引中的题目
  *
- * 多关键词为 AND 语义（topics + rawText 需同时包含全部关键词）。
+ * 默认多关键词为 AND 语义（topics + rawText 需同时包含全部关键词）。
+ * 传入 mode='or' 时为 OR 语义（并集去重），用于冲刺模式跨科综合题检索——
+ * 跨科 hub 关键词较多，AND 全命中几乎必然为空导致永远回退自出题，改用 OR 并集后
+ * 能真实召回跨科真题，再按 type!=='choice'（综合题）优先排序。
  * 排序规则：topics 命中权重（10 分/词）远高于 rawText 命中（1 分/词），
  * 得分相同则按年份倒序（优先近 6 年真题）。
  */
-function searchIndex(keywords) {
+function searchIndex(keywords, mode = 'and') {
   if (!fs.existsSync(INDEX_PATH)) {
     console.log('[WARN] 索引尚未建立，无法搜索。');
     return;
@@ -429,7 +433,10 @@ function searchIndex(keywords) {
     const topicsText = (q.topics?.join(' ') || '').toLowerCase();
     const rawText = (q.rawText || '').toLowerCase();
     const combined = `${topicsText} ${rawText}`;
-    if (!kws.every(kw => combined.includes(kw))) continue;
+    const matches = mode === 'or'
+      ? kws.some(kw => combined.includes(kw))
+      : kws.every(kw => combined.includes(kw));
+    if (!matches) continue;
 
     let score = 0;
     for (const kw of kws) {
@@ -440,7 +447,8 @@ function searchIndex(keywords) {
   }
   scored.sort((a, b) => b.score - a.score || b.q.year - a.q.year || a.q.number - b.q.number);
 
-  console.log(`\n🔍 搜索 ${keywords.map(k => `"${k}"`).join(' + ')}：${scored.length} 条结果\n`);
+  const joiner = mode === 'or' ? ' ∪ ' : ' + ';
+  console.log(`\n🔍 搜索 ${keywords.map(k => `"${k}"`).join(joiner)}（${mode === 'or' ? 'OR 并集' : 'AND'}）：${scored.length} 条结果\n`);
   scored.slice(0, 10).forEach(({ q, score }) => {
     const page = q.examPage ? `第${q.examPage}页` : '页码未知';
     console.log(`[${q.year}] 第${q.number}题 | ${q.type} | ${page} | ${q.subject || '?'} | 得分${score} | ${q.topics?.join(', ') || '未标注'}`);
@@ -464,7 +472,8 @@ function showHelp() {
   console.log(`  backfill --force      同上，并强制刷新已存在的 rawText/examPage（用于清理格式噪音）`);
   console.log(`  list                  列出所有已提取的年份`);
   console.log(`  stats                 查看题库统计`);
-  console.log(`  search <关键词>...     搜索索引中的题目（多关键词 AND；topics 命中优先于 rawText 命中）`);
+  console.log(`  search <关键词>...      搜索索引中的题目（多关键词 AND；topics 命中优先于 rawText 命中）`);
+  console.log(`  search --or <关键词>... 多关键词 OR 并集（用于冲刺模式跨科综合题检索）`);
   console.log(`  --help                显示帮助`);
 console.log(`\n索引构建流程：`);
   console.log(`  1. extract-all  → 提取 34 个 PDF 的纯文本`);
@@ -500,13 +509,17 @@ function main() {
     case 'backfill':
       backfill(args.includes('--force'));
       break;
-    case 'search':
-      if (!args[1]) {
-        console.error('用法：search <关键词> [关键词2 ...]（多关键词为 AND）');
+    case 'search': {
+      const rest = args.slice(1);
+      const mode = rest.includes('--or') ? 'or' : 'and';
+      const kws = rest.filter(a => a !== '--or');
+      if (!kws.length) {
+        console.error('用法：search [--or] <关键词> [关键词2 ...]（默认 AND；--or 为并集）');
         process.exit(1);
       }
-      searchIndex(args.slice(1));
+      searchIndex(kws, mode);
       break;
+    }
     case '--help':
     case 'help':
       showHelp();
