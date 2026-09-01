@@ -305,7 +305,13 @@ function updateQuestion(chapter, topic, correct, difficulty) {
 
 /**
  * 更新水平标签，写审计轨迹。
+ *
+ * 同级不同因的处理（信号不静默丢失）：
+ * - user_declared 重申同一水平：仍写入轨迹（用户自述是有效信号，带 note 标记）
+ * - phrasing_* 推断出同一水平：视为噪音，不入轨迹，通过返回值告知调用方
  */
+const MAX_LEVEL_HISTORY = 100;
+
 function updateLevel(level, reason) {
   const profile = readProfile();
   if (!profile) {
@@ -321,17 +327,30 @@ function updateLevel(level, reason) {
     process.exit(1);
   }
 
-  // 同一水平不重复写轨迹
-  if (profile.level !== level) {
-    profile.level = level;
-    profile.levelHistory.push({
-      level,
-      setAt: new Date().toISOString(),
-      reason,
-    });
-    writeProfile(profile);
+  profile.levelHistory = (profile.levelHistory || []).slice(-(MAX_LEVEL_HISTORY - 1));
+
+  if (profile.level === level) {
+    if (reason === 'user_declared') {
+      profile.levelHistory.push({
+        level,
+        setAt: new Date().toISOString(),
+        reason,
+        note: 'same-level reaffirm',
+      });
+      writeProfile(profile);
+      return { profile, changed: false, recorded: true };
+    }
+    return { profile, changed: false, recorded: false, note: 'level 未变化，phrasing 信号不入轨迹' };
   }
-  return profile;
+
+  profile.level = level;
+  profile.levelHistory.push({
+    level,
+    setAt: new Date().toISOString(),
+    reason,
+  });
+  writeProfile(profile);
+  return { profile, changed: true, recorded: true };
 }
 
 /**
@@ -421,8 +440,16 @@ function main() {
         console.error('用法：update-level --level <beginner|review|sprint> --reason <user_declared|phrasing_escalation|phrasing_downgrade>');
         process.exit(1);
       }
-      const p = updateLevel(flags.level, flags.reason);
-      console.log(JSON.stringify({ ok: true, action: 'update-level', level: p.level, levelHistory: p.levelHistory }, null, 2));
+      const { profile: p, changed, recorded, note } = updateLevel(flags.level, flags.reason);
+      console.log(JSON.stringify({
+        ok: true,
+        action: 'update-level',
+        changed,
+        recorded,
+        ...(note ? { note } : {}),
+        level: p.level,
+        levelHistory: p.levelHistory,
+      }, null, 2));
       break;
     }
     case 'reset': {
