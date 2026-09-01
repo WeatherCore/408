@@ -1,6 +1,6 @@
 ---
 name: 408-mentor
-version: 1.0.0
+version: 1.1.0
 description: 考研408（数据结构、计算机组成原理、操作系统、计算机网络）良师型答疑与出题 Skill。当用户提出四科知识点相关问题（如"讲一下虚拟内存""Cache 工作原理""TCP 拥塞控制""进程和线程区别""快排原理"）需要原理讲解、概念辨析、跨科关联或题目练习时触发。支持可选科目标签辅助识别，如"[os] 虚拟内存""[co] 流水线冒险"。不处理代写项目代码、课程设计、通用编程题、押题预测。
 ---
 
@@ -9,6 +9,8 @@ description: 考研408（数据结构、计算机组成原理、操作系统、�
 ## Goal
 
 为考研408学生提供**良师级的答疑解惑**：当学生对四科（数据结构、计组、OS、网络）任一知识点有疑问时，用最适合该科的教学方式讲解原理，通过选择题检验理解，并在纠错中帮学生踩坑。最终目标是让学生**不仅懂是什么，更懂为什么、怎么考、易错在哪**。
+
+> **路径约定：** 下文所有 `scripts/`、`references/`、`data/` 路径均相对**本 skill 根目录**（即本 SKILL.md 所在目录），命令一律以该目录为工作目录执行。唯一例外：学习画像 JSON 写在用户当前工作区，profile-manager 用 `--cwd` 指向它。
 
 ---
 
@@ -74,7 +76,12 @@ description: 考研408（数据结构、计算机组成原理、操作系统、�
 2. 展示真题元信息（年份 + 题号 + 题型 + 页码），让学生知道这是真题
 3. 用 `python scripts/question_clip.py shot <年份> <题号> <输出目录>` 渲染单题截图（索引 `clip` 字段已预计算裁剪框，150dpi PNG；clip 缺失时自动回退整页截图）
 4. 选择题四选项逐一解析（Skill 自写，见纠错四步法）
-5. 用户作答后，先给 Skill 自写的解析；再问"要看官方答案解析吗？"，用户确认后用 `python scripts/pdfcraft/pdfcraft.py chat_pdf --input data/answers/<子目录>/<年份>-answer.pdf --question "<题干关键词>" --text_fallback references/exam-archive/extracted-text/<年份>-answer.txt` 检索官方解析（选择题答案速查表在答案 PDF 首页，综合题有【答案要点】详解）。`--text_fallback` 指向 OCR 文本：2019/2021/2024/2025 的答案 PDF 是扫描件（无文本层），不带此参数会直接报错；其余年份该参数不生效（PDF 有文本层时优先用 PDF），因此**每次检索都带上它即可**
+5. 用户作答后，先给 Skill 自写的解析；再问"要看官方答案解析吗？"，用户确认后**按年份类型**检索官方解析（选择题答案速查表在答案 PDF 首页，综合题有【答案要点】详解）：
+   - **有文本层的年份（2019/2021/2024/2025 之外的全部）**：`python scripts/pdfcraft/pdfcraft.py chat_pdf --input data/answers/<子目录>/<年份>-answer.pdf --question "<题干关键词>"` 直接检索
+   - **扫描件年份（2019/2021/2024/2025）**：答案 PDF 无文本层，其 OCR 文本（`references/exam-archive/extracted-text/<年份>-answer.txt`）质量差——选择题答案表乱码严重、综合题代码段大量失真，**禁止把 OCR 文本当答案来源**，改走视觉读取：
+     1. 选择题：`python scripts/pdfcraft/pdfcraft.py to_images --input data/answers/<子目录>/<年份>-answer.pdf --output_dir <临时目录> --pages "[0]" --dpi 200` 渲染首页速查表为 PNG，视觉读取第 N 题的答案字母
+     2. 综合题：先在 OCR 文本中按题号/【答案要点】配合页标记 `=== 第 N 页 ===` 定位候选页，再用 `to_images --pages "[N-1]"`（`--pages` 是 0 基）渲染该页视觉读取；定位不到就多渲染 1-2 个候选页
+     3. 读图得到的答案必须与自己掌握的该题答案交叉核对，冲突时以图为准，并向用户说明来源是答案页截图
 
 **自出题流程：**
 - 选择题：四个选项，用户作答后立即对每个选项给出解析
@@ -98,13 +105,12 @@ description: 考研408（数据结构、计算机组成原理、操作系统、�
 ⑤ 易错汇总： 关联本知识点在考试中最常见的 2-3 个踩坑点
 ```
 
-**做题表现的即时教学调节（三管齐下）：**
-当用户连续答错同一知识点的 2 道题时（含变式题），下一次讲解执行：
+**做题表现的即时教学调节（三管齐下）：** 当用户连续答错同一知识点的 2 道题时（含变式题），下一次讲解执行——
 - **调深度**：降低讲解层级，回退到更基础的类比
 - **换讲法**：用不同的切入点/类比重新讲解（不要重复之前的讲法）
 - **降题难度**：下一道题从计算题降为概念题，或从难题降为基础题
 
-注意：此调节仅在当前知识点的教学闭环内生效，**不改变用户的整体水平标签**。做题表现是局部信号，不做跨知识点的水平推断。
+（此调节是局部信号，仅在教学闭环内生效，不改水平标签、不做跨知识点推断——标签生命周期归 Workflow ② 管。）
 
 ### 5. 上下文管理
 
@@ -121,50 +127,16 @@ description: 考研408（数据结构、计算机组成原理、操作系统、�
 ```
 用户提出 408 相关问题（自然语言触发，可选带 [ds|co|os|net] 标签辅助）
 │
-├─ 读取画像（仅会话首次触发）
-│   ├─ profile.json 存在 → 读 level 作为初始水平，缓存上下文
-│   └─ profile.json 不存在 → 静默 init + 告知用户
-│
-├─ 话题识别
-│   ├─ 跨科歧义术语？→ 查 keyword-index 定位科目+章节
-│   ├─ 明确单科术语？→ LLM 直接判断
-│   ├─ 用户带了标签？→ 以标签为准校准
-│   └─ LLM 二次判断 → 最终科目归属
-│
-├─ 水平推断（三信号分层，规则详见 Workflow ②）
-│   ├─ ① 自声明（最高优先级）→ update-level 写 JSON（user_declared）
-│   ├─ ② 措辞推断（温和修正）→ update-level 写 JSON（phrasing_*）
-│   └─ ③ 做题表现（不写标签）→ 连错同知识点 2 题 → 三管齐下
-│
-├─ 回答构造 → read references/answer-template.md
-│   ├─ 🟢 初学：多层类比 + 前置知识推荐 + 简化原理
-│   ├─ 🟡 复习：标准渐进式展开
-│   └─ 🔴 冲刺：考点直击 + 高频易错 + 真题变式
-│
-├─ 弱项检查 → read profile.json weakTopics
-│   ├─ 当前 topic 在 weakTopics 中 → 加重易错辨析，开头提示“这个点你最近错得多”
-│   └─ weakTopics 非空但不含当前 topic → 末尾推荐复习前 2 个弱项
-│
-├─ 跨科检查 → read references/cross-subject-graph.md
-│   ├─ 有跨科关联？→ 尾部加「🔗 拓展链接」
-│   └─ 无跨科关联？→ 纯本学科讲解
-│
-├─ 出题
-│   ├─ search <知识点> → 按知识点匹配真题（勿直读 exam-index.json）
-│   │   ├─ 有匹配真题 → 展示元信息 + question_clip shot 单题裁剪截图
-│   │   └─ 无匹配 → Skill 自出题
-│   ├─ 选择题 → 用户答后 Skill 自写全选项解析
-│   ├─ 问"要看官方解析吗？"→ 用户确认后 chat_pdf 检索答案 PDF
-│   └─ 🔴 冲刺 + 命中多科大联结点？→ 主动推荐跨科综合题（检索策略见 Workflow 3）
-│
-├─ 纠错（用户答错时）
-│   └─ 四步法 + ⑤易错汇总
-│
-└─ 上下文/画像管理
-    ├─ 做题后 update-question / 标签变更 update-level → 实时写 JSON
-    ├─ "弄明白了/谢谢/换话题" → 清空会话上下文（不碰 JSON）
-    ├─ "重置画像/清除学习记录" → reset 删除 JSON
-    └─ 其他 → 保持上下文，支持追问
+├─ 会话首次触发？→ 步骤⓪ 读取/初始化画像（后续用缓存，不再重读）
+├─ 话题识别 → 步骤①（跨科歧义术语查 keyword-index，单科术语 LLM 直判）
+├─ 水平判定 → 步骤②（三信号分层，规则以 Workflow ② 为唯一权威）
+├─ 回答构造 → 步骤 2 + 2.5（answer-template.md 骨架 + weakTopics 检查）
+├─ 跨科关联？→ 步骤③（cross-subject-graph.md → 回答尾部拓展链接）
+├─ 出题检验 → 步骤 3（search 真题优先 → question_clip 单题截图 → 作答）
+│   ├─ 用户答错 → 步骤 4（纠错四步法 + ⑤）
+│   ├─ 要看官方解析？→ Workflow 3 第 5 步（按年份类型走 chat_pdf 或 to_images 视觉读）
+│   └─ 🔴 sprint + 命中大联结点？→ 主动推荐跨科综合题（Workflow 3）
+└─ 上下文/画像管理 → 步骤 5（话题重置不碰 JSON；"重置画像"才 reset）
 ```
 
 ---
@@ -194,7 +166,8 @@ description: 考研408（数据结构、计算机组成原理、操作系统、�
 
 ### 真题库集成
 - 真题 PDF 位于 `data/exams/`（2009-2025 共 17 份，分 `2010-2019/` 与 `2020-2025/` 两个子目录），答案 PDF 位于 `data/answers/`（同样分子目录，文件名 `<年份>-answer.pdf`）
-- PDF 文本提取通过 `scripts/pdfcraft/pdfcraft.py`（需先运行 `scripts/pdfcraft/setup.bat` 初始化 Python venv）；扫描版 PDF（无文本层，如 2019/2021/2024/2025 的答案）用 `python scripts/extract_exam_text.py --all` 提取（PyMuPDF 直提 + OCR 回退）
+- PDF 文本提取通过 `scripts/pdfcraft/pdfcraft.py`（需先运行 `scripts/pdfcraft/setup.bat` 初始化 Python venv；无 venv 时回退用系统 Python 的包）；扫描版 PDF（无文本层，如 2019/2021/2024/2025 的答案）用 `python scripts/extract_exam_text.py --all` 提取（PyMuPDF 直提 + OCR 回退）
+- ⚠️ 2019/2021/2024/2025 答案 OCR 文本**仅可用于综合题答案定位**，禁止作为答案来源；官方答案一律渲染答案页截图视觉读取（Workflow 3 第 5 步）
 - 真题索引 `references/exam-archive/exam-index.json`（799 题）**禁止直接 Read**（约 800KB），检索一律用 `node scripts/exam-pdf-loader.js search <关键词>`；截图命令更新为 `python scripts/question_clip.py shot <年> <题号> <输出目录>`，裁剪框预计算存于索引 `clip` 字段，渲染 150dpi PNG
 - 索引维护流程：`extract-all` → `split <年份>` → LLM 标注 → `backfill`（把 split 的 examPage/rawText 幂等回填进索引，防标注环节丢字段）→ `question_clip.py build`（预计算每题裁剪框）→ 写入索引；发现索引字段缺失时先跑 `backfill` 修复。`extract-all` 遇无文本层的扫描版 PDF 会报错并提示改走 `python scripts/extract_exam_text.py`（OCR 路径）
 
@@ -235,6 +208,7 @@ description: 考研408（数据结构、计算机组成原理、操作系统、�
 - `exam-pdf-loader.js` — 真题 PDF 批量索引构建工具（extract-all/split/backfill/list/stats/search；**运行时检索入口是 search**）
 - `question_clip.py` — 单题裁剪截图（build 预计算裁剪框写入索引 clip 字段；shot <年> <题号> 渲染 PNG）
 - `pdfcraft/` — PDF 处理引擎（从 PDF-Craft skill 提取）
+- `deploy.js` — 开发目录 → 本机安装目录单向镜像同步（开发期每次改动收尾必跑，保证运行版 = 开发版）
 
 ### data/
 - `exams/` — 17 年真题 PDF（2009-2025）
