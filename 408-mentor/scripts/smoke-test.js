@@ -116,6 +116,21 @@ async function mainAsync() {
       '并发写入的 5 条记录全部落盘（写锁生效，无丢更新）'
     );
 
+    // 4.7 update-level 三个分支：真实变更 / 同级 user_declared 重申 / 同级 phrasing 噪音
+    const lv1 = run(['update-level', '--level', 'sprint', '--reason', 'user_declared']);
+    assert(lv1.changed === true && lv1.level === 'sprint', 'update-level 真实变更返回 changed=true');
+    const histLen = lv1.levelHistory.length;
+    const lv2 = run(['update-level', '--level', 'sprint', '--reason', 'user_declared']);
+    assert(
+      lv2.changed === false && lv2.recorded === true && lv2.levelHistory.length === histLen + 1,
+      '同级 user_declared 重申写入轨迹（自述信号不丢）'
+    );
+    const lv3 = run(['update-level', '--level', 'sprint', '--reason', 'phrasing_escalation']);
+    assert(
+      lv3.changed === false && lv3.recorded === false && lv3.levelHistory.length === histLen + 1,
+      '同级 phrasing 信号不入轨迹（防噪音刷史）'
+    );
+
     // 5. reset
     const resetRes = run(['reset']);
     assert(resetRes.reset === true && !fs.existsSync(path.join(TEST_DIR, '.408-mentor', 'profile.json')), 'reset 删除画像文件');
