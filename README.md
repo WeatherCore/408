@@ -175,13 +175,25 @@ flowchart TB
 <details>
 <summary><b>📄 官方解析提取命令（点击展开）</b></summary>
 
-用户作答并确认想看官方解析后运行（`--text_fallback` 每次都带上——2019/2021/2024/2025 的答案 PDF 是扫描件无文本层，缺参会直接报错；有文本层的年份该参数自动不生效）：
+用户作答并确认想看官方解析后，**按年份类型分两条路径**（选择题答案速查表在答案 PDF 首页，综合题有【答案要点】详解）：
+
+**① 有文本层的年份（2019/2021/2024/2025 之外全部）**——`chat_pdf` 直接检索：
 
 ```
-python scripts/pdfcraft/pdfcraft.py chat_pdf --input data/answers/<2010-2019|2020-2025>/<年份>-answer.pdf --question "<题干关键词>" --text_fallback references/exam-archive/extracted-text/<年份>-answer.txt
+python scripts/pdfcraft/pdfcraft.py chat_pdf --input data/answers/<2010-2019|2020-2025>/<年份>-answer.pdf --question "<题干关键词>"
 ```
 
-选择题答案速查表在答案 PDF 首页，综合题有【答案要点】详解。
+**② 扫描件年份（2019/2021/2024/2025）**——OCR 文本质量差（答案表乱码、代码段失真），禁止当答案来源，改用 `to_images` 渲染答案页后**视觉读取**：
+
+```
+# 选择题：渲染首页答案速查表（--pages 0 基）
+python scripts/pdfcraft/pdfcraft.py to_images --input data/answers/<子目录>/<年份>-answer.pdf --output_dir <临时目录> --pages "[0]" --dpi 200
+
+# 综合题：先在 extracted-text/<年份>-answer.txt 里按题号/【答案要点】配合页标记定位候选页 N，再渲染该页
+python scripts/pdfcraft/pdfcraft.py to_images --input data/answers/<子目录>/<年份>-answer.pdf --output_dir <临时目录> --pages "[N-1]" --dpi 200
+```
+
+读图答案须与自己掌握的该题答案交叉核对，冲突时以图为准。
 
 </details>
 
@@ -241,9 +253,9 @@ flowchart TB
 
 - 🎯 **渐进式展开回答** — 🎯直觉 → 📚原理 → ⚠️易错 → 📝考点 → ✍️出题五层必出，细节与代码图示追问时才展开（`references/answer-template.md`）
 - 🎚️ **三水平自适应** — 初学（类比+前置知识）/ 复习（完整推理链）/ 冲刺（考点直击+真题变式）三档教学策略
-- 📝 **真题出题闭环** — `search` 检索 799 题索引 → `question_clip shot` 单题裁剪截图 → 自写四选项解析 → `chat_pdf` 按需提取官方解析
+- 📝 **真题出题闭环** — `search` 检索 799 题索引 → `question_clip shot` 单题裁剪截图 → 自写四选项解析 → 按年份类型 `chat_pdf`/`to_images` 提取官方解析
 - 🖼️ **单题裁剪截图** — 命中真题后裁剪为单题 PNG，避免整页暴露邻题，公式图表原貌保留（`question_clip.py`）
-- 🔍 **扫描件 OCR 兜底** — 2019/2021/2024/2025 四份扫描版答案 PDF 经 300dpi OCR 入库，检索自动回退（`extract_exam_text.py`）
+- 👁️ **扫描年答案视觉读取** — 2019/2021/2024/2025 扫描版答案 PDF 的 OCR 文本仅用于页面定位，官方答案一律渲染答案页截图视觉读取，杜绝乱码误答（`pdfcraft to_images`）
 - 🧠 **跨会话学习画像** — `.408-mentor/profile.json` 记录水平标签与逐题对错，会话重置不丢档案（`profile-manager.js`）
 - 📌 **弱项自动追踪** — 滑动窗口规则（近 10 题同一知识点 ≥3 答且正确率 <50%）自动标记弱项，回答开头主动加重辨析
 - 🩹 **纠错四步法 + ⑤易错汇总** — 鼓励 → 指错因 → 重讲推理 → 变式题，再汇总该考点 2-3 个真实踩坑点（`common-mistakes-archive.md`）
@@ -404,6 +416,7 @@ Skill 会自动识别问题属于哪个科目。想手动限定视角时，在�
 │   │   ├── exam-pdf-loader.js         ← 真题批量索引构建（extract-all/split/backfill/list/stats/search）
 │   │   ├── extract_exam_text.py       ← 真题文本提取（PyMuPDF 直提 + OCR fallback）
 │   │   ├── question_clip.py           ← 单题裁剪截图（build 预计算裁剪框 / shot 渲染单题）
+│   │   ├── deploy.js                  ← 开发目录 → 安装目录单向镜像同步（改动收尾必跑）
 │   │   └── pdfcraft/                  ← PDF 处理引擎（从 PDF-Craft 提取）
 │   │       ├── pdfcraft.py            ← CLI 入口，49 个命令
 │   │       ├── pdfkit/                ← 内置命令包
