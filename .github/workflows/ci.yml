@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Python (for question_clip / pdfcraft)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install PyMuPDF
+        run: pip install pymupdf
+
+      # CI 无 venv（被 .gitignore 排除），question_clip.py 会回退到系统 Python
+      # 如未来需要 tesseract OCR 路径的测试，另加 apt install tesseract-ocr tesseract-ocr-chi-sim
+
+      - name: Run smoke tests (profile / index / search / clip / answers)
+        working-directory: 408-mentor
+        run: node scripts/smoke-test.js
+
+      - name: Validate answers.json integrity
+        working-directory: 408-mentor
+        run: node scripts/answers_builder.js --check
+
+      - name: Validate cross-subject-hub.json
+        working-directory: 408-mentor
+        run: node -e "const h=require('./references/cross-subject-hub.json'); if(!Array.isArray(h.hubs)||h.hubs.length<7) process.exit(1); console.log('hubs:', h.hubs.length)"
+
+      # Linux 下 GBK 控制台问题不复现；此步确认 stdout 重配未破坏正常输出
+      - name: Render one question clip (POSIX sanity)
+        working-directory: 408-mentor
+        run: python scripts/question_clip.py shot 2023 28 /tmp/408-shot && ls -la /tmp/408-shot
