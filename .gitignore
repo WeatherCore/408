@@ -7,6 +7,9 @@ __pycache__/
 *.so
 projects/
 
+# 本地工具缓存（视觉检查产物、临时渲染图）
+.dsh-vision-router/
+
 # Distribution / packaging
 .Python
 build/
