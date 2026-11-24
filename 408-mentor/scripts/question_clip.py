@@ -20,6 +20,16 @@ import re
 import sys
 from typing import List, Tuple
 
+# Windows 中文控制台（cp936/GBK）下打印 emoji（如 📷）会抛 UnicodeEncodeError，
+# 导致 PNG 已生成但进程报 exit 1（冒烟测试第 8 步曾因此 FAIL）。
+# 统一将标准流重配为 UTF-8，无法编码的字符降级为替换符而不是崩溃。
+for _stream in (sys.stdout, sys.stderr):
+    if _stream is not None and hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except (ValueError, OSError):
+            pass
+
 # 激活 pdfcraft venv（镜像 pdfcraft.py 的引导逻辑）
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _VENV_DIR = os.path.join(_SCRIPT_DIR, "pdfcraft", "venv")
@@ -68,7 +78,7 @@ LEFT_MARGIN_THRESHOLD = 60  # pt，题号行通常靠近左页边（约 40pt）
 
 
 def subdir_for_year(year):
-    return "2010-2019" if year <= 2019 else "2020-2025"
+    return "2009-2019" if year <= 2019 else "2020-2025"
 
 
 def get_lines_from_dict(d) -> List[Tuple[str, list]]:
