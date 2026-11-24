@@ -32,7 +32,34 @@ const VALID_REASONS = new Set([
   'phrasing_downgrade',
 ]);
 
-const SCHEMA_VERSION = '1';
+const SCHEMA_VERSION = '2';
+
+// questionLog 主日志上限：超过后最老记录归档到 questionLog.archive.json（数据保留不删，主文件保持轻量）
+const QUESTION_LOG_LIMIT = 2000;
+
+/**
+ * 画像 schema 迁移（读入内存时执行，写盘发生在下一次变更命令的 writeProfile）。
+ *
+ * v1 → v2（subjects 多值化）：
+ *   v1 的 subject 为 init 时单值，后写的科目不会更新顶层字段；
+ *   v2 改为 subjects 数组，update-question 按章节推断自动并入。
+ *   迁移规则：subjects = 旧 subject 单值包装成数组；删除旧字段；version 升到 2。
+ *
+ * 未知未来版本：原样返回（向前兼容，不做任何破坏性处理）。
+ */
+function migrateProfile(profile) {
+  if (!profile || typeof profile !== 'object') return profile;
+  if (profile.version === SCHEMA_VERSION) return profile;
+  if (profile.version !== '1' && profile.version !== undefined) {
+    return profile; // 未来版本，不迁移
+  }
+  if (!Array.isArray(profile.subjects)) {
+    profile.subjects = profile.subject ? [profile.subject] : [];
+  }
+  delete profile.subject;
+  profile.version = SCHEMA_VERSION;
+  return profile;
+}
 
 // 弱项计算参数：最近 WINDOW 条该 topic 记录中，若答题数 >= MIN_ATTEMPTS 且正确率 < 50%，则标记为弱项
 const WEAK_TOPIC_WINDOW_SIZE = 10;
@@ -85,7 +112,7 @@ function readProfile() {
     return null;
   }
   try {
-    return JSON.parse(fs.readFileSync(PROFILE_PATH, 'utf-8'));
+    return migrateProfile(JSON.parse(fs.readFileSync(PROFILE_PATH, 'utf-8')));
   } catch (e) {
     console.error(`[ERROR] 画像文件损坏，无法解析：${e.message}`);
     process.exit(2);
@@ -113,7 +140,8 @@ function initProfile(subject, level) {
   const now = new Date().toISOString();
   const profile = {
     version: SCHEMA_VERSION,
-    subject,
+    // v2：科目多值。首个科目来自 init 参数；update-question 会按章节推断自动并入新科目
+    subjects: [subject],
     createdAt: now,
     updatedAt: now,
     level,
@@ -255,6 +283,41 @@ function recalculateWeakTopics(profile) {
 }
 
 /**
+ * 归档路径与读写：questionLog.archive.json 与 profile.json 同目录。
+ * 归档数据永久保留（不删任何做题记录），只是从主文件移出以控制体积。
+ */
+function archivePath() {
+  return path.join(path.dirname(PROFILE_PATH), 'questionLog.archive.json');
+}
+
+function readArchive() {
+  try {
+    const data = JSON.parse(fs.readFileSync(archivePath(), 'utf-8'));
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return []; // 归档不存在或损坏时从空归档开始（损坏预警交给用户观察文件）
+  }
+}
+
+function writeArchive(entries) {
+  fs.writeFileSync(archivePath(), JSON.stringify(entries, null, 2), 'utf-8');
+}
+
+/**
+ * questionLog 超限归档：主日志只保留最近 QUESTION_LOG_LIMIT 条，
+ * 更老的记录按时间序追加进归档文件。返回本次归档条数（0 = 未触发）。
+ * 必须在写锁内调用（update-question 已持锁）。
+ */
+function archiveOverflow(profile) {
+  const log = profile.questionLog || [];
+  if (log.length <= QUESTION_LOG_LIMIT) return 0;
+  const overflow = log.slice(0, log.length - QUESTION_LOG_LIMIT);
+  profile.questionLog = log.slice(log.length - QUESTION_LOG_LIMIT);
+  writeArchive(readArchive().concat(overflow));
+  return overflow.length;
+}
+
+/**
  * 追加一条做题记录，并同步更新统计与弱项。
  */
 function updateQuestion(chapter, topic, correct, difficulty) {
@@ -298,9 +361,16 @@ function updateQuestion(chapter, topic, correct, difficulty) {
     profile.stats.byChapter[chapter] = { total: 1, correct: isCorrect ? 1 : 0 };
   }
 
+  // v2：按章节推断科目并入 subjects（多值），跨科提问自动扩科
+  const inferred = inferSubjectFromChapter(chapter);
+  if (inferred !== 'unknown' && Array.isArray(profile.subjects) && !profile.subjects.includes(inferred)) {
+    profile.subjects.push(inferred);
+  }
+
   recalculateWeakTopics(profile);
+  const archivedCount = archiveOverflow(profile);
   writeProfile(profile);
-  return profile;
+  return { profile, archived: archivedCount };
 }
 
 /**
@@ -354,14 +424,21 @@ function updateLevel(level, reason) {
 }
 
 /**
- * 重置画像（删除文件）。
+ * 重置画像（删除文件）。归档文件一并删除——"清除学习记录"语义应覆盖全部做题数据。
  */
 function resetProfile() {
+  const result = { reset: false, path: PROFILE_PATH, note: '文件不存在，无需重置' };
   if (fs.existsSync(PROFILE_PATH)) {
     fs.unlinkSync(PROFILE_PATH);
-    return { reset: true, path: PROFILE_PATH };
+    result.reset = true;
+    delete result.note;
   }
-  return { reset: false, path: PROFILE_PATH, note: '文件不存在，无需重置' };
+  const arch = archivePath();
+  if (fs.existsSync(arch)) {
+    fs.unlinkSync(arch);
+    result.archivedRemoved = true;
+  }
+  return result;
 }
 
 /**
@@ -431,8 +508,8 @@ function main() {
         console.error('用法：update-question --chapter <章节> --topic <主题> --correct <true|false> --difficulty <easy|medium|hard>');
         process.exit(1);
       }
-      const p = updateQuestion(flags.chapter, flags.topic, flags.correct, flags.difficulty);
-      console.log(JSON.stringify({ ok: true, action: 'update-question', stats: p.stats, weakTopics: p.weakTopics }, null, 2));
+      const { profile: p, archived } = updateQuestion(flags.chapter, flags.topic, flags.correct, flags.difficulty);
+      console.log(JSON.stringify({ ok: true, action: 'update-question', stats: p.stats, weakTopics: p.weakTopics, ...(archived ? { archivedToLog: archived } : {}) }, null, 2));
       break;
     }
     case 'update-level': {
