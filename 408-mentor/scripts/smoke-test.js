@@ -131,9 +131,63 @@ async function mainAsync() {
       '同级 phrasing 信号不入轨迹（防噪音刷史）'
     );
 
+    // 4.8 subjects 多值化：init 单科目 os，4.6 已写入 DS 章节记录，subjects 应自动并入 ds，旧 subject 字段移除
+    const subjRes = run(['read']);
+    assert(
+      Array.isArray(subjRes.subjects) && subjRes.subjects.includes('os') && subjRes.subjects.includes('ds') && subjRes.subject === undefined,
+      `subjects 多值：跨科记录自动并入（实际 [${(subjRes.subjects || []).join(',')}]）`
+    );
+
+    // 4.9 v1→v2 迁移：手写一份 v1 画像（单值 subject），read 应内存升级；下次写盘时 version/结构持久化
+    const profilePath = path.join(TEST_DIR, '.408-mentor', 'profile.json');
+    const v1Profile = {
+      version: '1',
+      subject: 'net',
+      createdAt: '2025-01-01T00:00:00.000Z',
+      updatedAt: '2025-01-01T00:00:00.000Z',
+      level: 'beginner',
+      levelHistory: [{ level: 'beginner', setAt: '2025-01-01T00:00:00.000Z', reason: 'user_declared' }],
+      stats: { totalQuestions: 0, correct: 0, wrong: 0, byChapter: {} },
+      questionLog: [],
+      weakTopics: [],
+    };
+    fs.writeFileSync(profilePath, JSON.stringify(v1Profile, null, 2), 'utf-8');
+    const migrated = run(['read']);
+    assert(
+      migrated.version === '2' && Array.isArray(migrated.subjects) && migrated.subjects[0] === 'net' && migrated.subject === undefined,
+      'v1 画像读取时自动迁移为 v2（subject→subjects，version 升 2）'
+    );
+    run(['update-level', '--level', 'review', '--reason', 'user_declared']);
+    const persisted = JSON.parse(fs.readFileSync(profilePath, 'utf-8'));
+    assert(
+      persisted.version === '2' && persisted.subject === undefined && persisted.subjects[0] === 'net',
+      '迁移结构在下次变更写盘时持久化（version 字段落地）'
+    );
+
+    // 4.10 questionLog 归档：塞 2050 条历史记录，再写 1 条应触发溢出归档（主日志回到 2000，51 条进归档文件）
+    const bigLog = Array.from({ length: 2050 }, (_, i) => ({
+      timestamp: new Date(Date.UTC(2025, 0, 1, 0, 0, i)).toISOString(),
+      chapter: 'OS-内存管理',
+      topic: '归档测试',
+      correct: i % 2 === 0,
+      difficulty: 'easy',
+    }));
+    const cur = JSON.parse(fs.readFileSync(profilePath, 'utf-8'));
+    cur.questionLog = bigLog;
+    fs.writeFileSync(profilePath, JSON.stringify(cur, null, 2), 'utf-8');
+    const archRes = run(['update-question', '--chapter', 'OS-内存管理', '--topic', '归档测试', '--correct', 'true', '--difficulty', 'easy']);
+    const archiveFile = path.join(TEST_DIR, '.408-mentor', 'questionLog.archive.json');
+    const archivedEntries = JSON.parse(fs.readFileSync(archiveFile, 'utf-8'));
+    const afterArch = run(['read']);
+    assert(
+      archRes.ok && archRes.archivedToLog === 51 && afterArch.questionLog.length === 2000 && archivedEntries.length === 51,
+      `questionLog 超限归档（主日志 ${afterArch.questionLog.length} 条，归档 ${archivedEntries.length} 条）`
+    );
+
     // 5. reset
     const resetRes = run(['reset']);
     assert(resetRes.reset === true && !fs.existsSync(path.join(TEST_DIR, '.408-mentor', 'profile.json')), 'reset 删除画像文件');
+    assert(resetRes.archivedRemoved === true && !fs.existsSync(archiveFile), 'reset 同时删除归档文件（清除学习记录覆盖全部做题数据）');
 
     // 6. 索引完整性（无需画像目录，直接读仓库索引）
     const index = JSON.parse(fs.readFileSync(INDEX_PATH, 'utf-8'));
@@ -192,6 +246,22 @@ async function mainAsync() {
     const singleFirst = singleOut2.split('\n').find(l => l.trim().startsWith('['));
     const scoreMatch = singleFirst && singleFirst.match(/得分(\d+)/);
     assert(scoreMatch && parseInt(scoreMatch[1], 10) >= 10, `首条为 topics 命中（得分>=10，实际 ${scoreMatch ? scoreMatch[1] : '无'}）`);
+
+    // 10. --syn 同义词组扩展：同根异写词（快排≡快速排序）应显著扩大召回，且原词行为不变
+    const plainOut = execSync(`"${NODE}" "${path.join(ROOT, 'scripts', 'exam-pdf-loader.js')}" search 快排`, { encoding: 'utf-8', cwd: ROOT });
+    const plainCount = parseInt((plainOut.match(/（AND）：(\d+) 条结果/) || [])[1] || '0', 10);
+    const synOut = execSync(`"${NODE}" "${path.join(ROOT, 'scripts', 'exam-pdf-loader.js')}" search --syn 快排`, { encoding: 'utf-8', cwd: ROOT });
+    const synCount = parseInt((synOut.match(/条结果/) ? (synOut.match(/：(\d+) 条结果/) || [])[1] : '0'), 10) || parseInt((synOut.match(/（AND \+ 同义扩展）：(\d+) 条结果/) || [])[1] || '0', 10);
+    const synExpanded = synOut.includes('同义扩展') && synOut.includes('≡快速排序');
+    assert(synExpanded && synCount > plainCount, `--syn 同义扩展扩大召回（快排 ${plainCount} → ${synCount} 条，标注含 ≡快速排序）`);
+
+    // 11. --syn 组内命中参与 AND：TLB+虚拟内存 直查为空（索引用词是 页式虚拟存储/虚拟地址），
+    //     --syn 后经 TLB≡快表、虚拟内存≡虚拟存储器/页式虚拟存储 扩展应真实共现
+    const synAndMiss = execSync(`"${NODE}" "${path.join(ROOT, 'scripts', 'exam-pdf-loader.js')}" search TLB 虚拟内存`, { encoding: 'utf-8', cwd: ROOT });
+    const missBefore = parseInt((synAndMiss.match(/（AND）：(\d+) 条结果/) || [])[1] || '0', 10);
+    const synAnd = execSync(`"${NODE}" "${path.join(ROOT, 'scripts', 'exam-pdf-loader.js')}" search --syn TLB 虚拟内存`, { encoding: 'utf-8', cwd: ROOT });
+    const synAndCount = parseInt((synAnd.match(/（AND \+ 同义扩展）：(\d+) 条结果/) || [])[1] || '0', 10);
+    assert(missBefore === 0 && synAndCount > 0, `--syn 组内命中参与 AND（TLB+虚拟内存：直查 ${missBefore} 条 → 同义扩展 ${synAndCount} 条）`);
 
     console.log('\n🎉 所有冒烟测试通过');
 }
