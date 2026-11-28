@@ -1,6 +1,6 @@
 ---
 name: 408-mentor
-version: 1.1.0
+version: 1.2.0
 description: 考研408（数据结构、计算机组成原理、操作系统、计算机网络）良师型答疑与出题 Skill。当用户提出四科知识点相关问题（如"讲一下虚拟内存""Cache 工作原理""TCP 拥塞控制""进程和线程区别""快排原理"）需要原理讲解、概念辨析、跨科关联或题目练习时触发。支持可选科目标签辅助识别，如"[os] 虚拟内存""[co] 流水线冒险"。不处理代写项目代码、课程设计、通用编程题、押题预测。
 ---
 
@@ -68,20 +68,20 @@ description: 考研408（数据结构、计算机组成原理、操作系统、�
 
 **出题源决策：**
 - 用 `node scripts/exam-pdf-loader.js search <知识点关键词>` 检索真题（结果含年份/题号/题型/页码/知识点，按相关性+年份倒序）。⚠️ **不要直接读 `exam-index.json`**——约 800KB 会撑爆上下文，检索一律走 search 子命令
+- **首查 < 3 条时加 `--syn` 重查**：`search --syn <词>` 自动扩展同义词组（"快排"→快速排序、"页式存储"→虚拟内存/虚拟存储器、"TLB"→快表），词表见 `references/exam-archive/search-synonyms.json`
 - 索引中有匹配当前知识点的真题 → 用真题（优先近 6 年，即 2020-2025，search 结果已按年份倒序）
 - 索引中无匹配 / 匹配质量差 → Skill 自出题（琐碎知识点、未考过的角度由 Skill 补位）
 
 **真题出题流程：**
-1. 运行 `node scripts/exam-pdf-loader.js search <知识点关键词>`，从结果中选题
+1. 运行 `node scripts/exam-pdf-loader.js search <知识点关键词>`（首查少可加 `--syn`），从结果中选题
 2. 展示真题元信息（年份 + 题号 + 题型 + 页码），让学生知道这是真题
 3. 用 `python scripts/question_clip.py shot <年份> <题号> <输出目录>` 渲染单题截图（索引 `clip` 字段已预计算裁剪框，150dpi PNG；clip 缺失时自动回退整页截图）
 4. 选择题四选项逐一解析（Skill 自写，见纠错四步法）
-5. 用户作答后，先给 Skill 自写的解析；再问"要看官方答案解析吗？"，用户确认后**按年份类型**检索官方解析（选择题答案速查表在答案 PDF 首页，综合题有【答案要点】详解）：
-   - **有文本层的年份（2019/2021/2024/2025 之外的全部）**：`python scripts/pdfcraft/pdfcraft.py chat_pdf --input data/answers/<子目录>/<年份>-answer.pdf --question "<题干关键词>"` 直接检索
-   - **扫描件年份（2019/2021/2024/2025）**：答案 PDF 无文本层，其 OCR 文本（`references/exam-archive/extracted-text/<年份>-answer.txt`）质量差——选择题答案表乱码严重、综合题代码段大量失真，**禁止把 OCR 文本当答案来源**，改走视觉读取：
-     1. 选择题：`python scripts/pdfcraft/pdfcraft.py to_images --input data/answers/<子目录>/<年份>-answer.pdf --output_dir <临时目录> --pages "[0]" --dpi 200` 渲染首页速查表为 PNG，视觉读取第 N 题的答案字母
-     2. 综合题：先在 OCR 文本中按题号/【答案要点】配合页标记 `=== 第 N 页 ===` 定位候选页，再用 `to_images --pages "[N-1]"`（`--pages` 是 0 基）渲染该页视觉读取；定位不到就多渲染 1-2 个候选页
-     3. 读图得到的答案必须与自己掌握的该题答案交叉核对，冲突时以图为准，并向用户说明来源是答案页截图
+5. 用户作答后，先给 Skill 自写的解析；再问"要看官方答案解析吗？"，用户确认后**先查答案速查表，必要时才开 PDF**：
+   - **① 官方答案字母（选择题）：一律先查 `references/exam-archive/answers.json`**——`years.<年>.choiceAnswers` 收录 17 年 × 40 题官方答案，全部经答案页截图视觉核验（`verified: true`），直接读表取答案。仅当表中该题缺失时（`answers_builder.js --check` 保证完整性，理论上不发生）才回退：渲染答案首页视觉读取，并与自己掌握的答案交叉核对，冲突以图为准
+   - **② 官方解析正文（用户想看"为什么"时）：按年份类型两条路**——
+     - 有文本层的年份（2019/2021/2024/2025 之外全部）：`python scripts/pdfcraft/pdfcraft.py chat_pdf --input data/answers/<子目录>/<年份>-answer.pdf --question "<题干关键词>"` 直接检索
+     - 扫描件年份（2019/2021/2024/2025）：OCR 文本质量差，禁止当解析来源。综合题先查 `answers.json` 的 `years.<年>.comprehensivePages`（预定位的答案起始页码），用 `to_images --pages "[N-1]"`（0 基）渲染该页视觉读取；页码缺失时按 OCR 文本页标记 `=== 第 N 页 ===` 定位候选页（多渲染 1-2 页）
 
 **自出题流程：**
 - 选择题：四个选项，用户作答后立即对每个选项给出解析
@@ -165,16 +165,15 @@ description: 考研408（数据结构、计算机组成原理、操作系统、�
 - 跨科拓展链接必须**具体**（不能只说"这也涉及OS"，要说"这涉及OS的内存管理章节的页表机制"）
 
 ### 真题库集成
-- 真题 PDF 位于 `data/exams/`（2009-2025 共 17 份，分 `2010-2019/` 与 `2020-2025/` 两个子目录），答案 PDF 位于 `data/answers/`（同样分子目录，文件名 `<年份>-answer.pdf`）
-- PDF 文本提取通过 `scripts/pdfcraft/pdfcraft.py`（需先运行 `scripts/pdfcraft/setup.bat` 初始化 Python venv；无 venv 时回退用系统 Python 的包）；扫描版 PDF（无文本层，如 2019/2021/2024/2025 的答案）用 `python scripts/extract_exam_text.py --all` 提取（PyMuPDF 直提 + OCR 回退）
-- ⚠️ 2019/2021/2024/2025 答案 OCR 文本**仅可用于综合题答案定位**，禁止作为答案来源；官方答案一律渲染答案页截图视觉读取（Workflow 3 第 5 步）
-- 真题索引 `references/exam-archive/exam-index.json`（799 题）**禁止直接 Read**（约 800KB），检索一律用 `node scripts/exam-pdf-loader.js search <关键词>`；截图命令更新为 `python scripts/question_clip.py shot <年> <题号> <输出目录>`，裁剪框预计算存于索引 `clip` 字段，渲染 150dpi PNG
-- 索引维护流程：`extract-all` → `split <年份>` → LLM 标注 → `backfill`（把 split 的 examPage/rawText 幂等回填进索引，防标注环节丢字段）→ `question_clip.py build`（预计算每题裁剪框）→ 写入索引；发现索引字段缺失时先跑 `backfill` 修复。`extract-all` 遇无文本层的扫描版 PDF 会报错并提示改走 `python scripts/extract_exam_text.py`（OCR 路径）
+- 真题 PDF 位于 `data/exams/`（2009-2025 共 17 份，分 `2009-2019/` 与 `2020-2025/` 两个子目录），答案 PDF 位于 `data/answers/`（同样分子目录，文件名 `<年份>-answer.pdf`）
+- 真题检索/索引重建/官方解析提取的**完整命令规程见 `references/workflow-details.md`**（含扫描年视觉读取细则、索引五步重建流程、答案表维护）
+- ⚠️ 2019/2021/2024/2025 答案 OCR 文本（`references/exam-archive/extracted-text/<年份>-answer.txt`）**仅可用于综合题答案页定位**，禁止作为答案/解析来源；官方答案一律先查 `answers.json`（已视觉核验），解析正文按需渲染答案页读取（见 references/workflow-details.md）
 
 ### 学习画像 JSON 约束
 - 画像位置：当前工作目录下 `.408-mentor/profile.json`；建议 SKILL 调用时显式传 `--cwd "${workspace}"`
 - JSON 读写一律通过 `scripts/profile-manager.js`，不直接用 fs 操作（避免格式漂移）；水平标签变更规则与 weakTopics 出入列阈值以 Workflow ①②③ 为准，此处不重复
-- 话题重置不清 JSON；只有用户明确说"重置画像"才清 JSON
+- 画像 schema v2：`subjects` 为**数组**（跨科提问自动并入）；v1 旧文件读取时自动迁移，无需手工处理；`questionLog` 超 2000 条自动归档到 `questionLog.archive.json`（数据不丢）
+- 话题重置不清 JSON；只有用户明确说"重置画像"才 reset（reset 同时删除归档文件）
 - `.408-mentor/` 应加入 `.gitignore`，避免用户学习数据被误提交
 
 ---
@@ -196,17 +195,22 @@ description: 考研408（数据结构、计算机组成原理、操作系统、�
 - `408-syllabus-outline.md` — 四科完整考纲大纲
 - `408-keyword-index.md` — 术语→科目→章节映射表（用于 A+B 混合识别）
 - `cross-subject-graph.md` — 跨科目知识联结点图谱
-- `cross-subject-hub.json` — 多科大联结点结构化数据（冲刺模式跨科综合题推荐用）
+- `cross-subject-hub.json` — 多科大联结点结构化数据（冲刺模式跨科综合题推荐用，7 联结点与 graph.md 第 5 节一一对应）
 - `common-mistakes-archive.md` — 四科高频易错点档案
 - `answer-template.md` — 回答结构模板、四科教学风格、纠错规程与示例
+- `workflow-details.md` — **低频规程下沉**：索引重建五步、扫描年答案视觉读取细则、解析正文提取、PDF 环境初始化
 - `exam-archive/` — 真题索引数据（倒排索引 JSON，由索引构建流程生成）
+  - `exam-index.json` — 799 题倒排索引（禁止直接 Read，检索走 exam-pdf-loader.js search）
+  - `answers.json` — **官方答案速查表**（17 年 × 40 题选择题答案 + 综合题答案页码，已视觉核验）
+  - `search-synonyms.json` — search --syn 同义词组表
 
 ### scripts/
 - `profile-manager.js` — 学习画像 JSON 读写工具（read/init/update-question/update-level/reset）
-- `smoke-test.js` — 画像与弱项计算冒烟测试
+- `smoke-test.js` — 画像/弱项/索引/搜索/截图冒烟测试
 - `build-keyword-index.js` — 从考纲数据构建/更新术语索引
-- `exam-pdf-loader.js` — 真题 PDF 批量索引构建工具（extract-all/split/backfill/list/stats/search；**运行时检索入口是 search**）
+- `exam-pdf-loader.js` — 真题 PDF 批量索引构建工具（extract-all/split/backfill/list/stats/search；**运行时检索入口是 search**，支持 --or/--syn）
 - `question_clip.py` — 单题裁剪截图（build 预计算裁剪框写入索引 clip 字段；shot <年> <题号> 渲染 PNG）
+- `answers_builder.js` — 官方答案表构建与完整性校验（--check；维护 answers.json）
 - `pdfcraft/` — PDF 处理引擎（从 PDF-Craft skill 提取）
 - `deploy.js` — 开发目录 → 本机安装目录单向镜像同步（开发期每次改动收尾必跑，保证运行版 = 开发版）
 
